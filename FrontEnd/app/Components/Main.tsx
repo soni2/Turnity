@@ -1,4 +1,7 @@
 import { JSX } from "react";
+import { Buttons } from "./Buttons";
+import { useFunctions } from "../hooks/useFunctions";
+import Link from "next/link";
 
 type Servicios = {
   id: number;
@@ -28,6 +31,8 @@ export default function Main({
   setOrdenarPor,
   renderStars,
 }: Props) {
+  const { handleRouter } = useFunctions();
+
   return (
     <main className="flex-1">
       {/* Categorías rápidas */}
@@ -69,7 +74,9 @@ export default function Main({
             key={servicio.id}
             className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6"
           >
-            <h3 className="font-semibold text-lg mb-1">{servicio.title}</h3>
+            <Link href={`/business/${servicio.id}`}>
+              <h3 className="font-semibold text-lg mb-1">{servicio.title}</h3>
+            </Link>
             <p className="text-gray-600 text-sm mb-3">{servicio.description}</p>
 
             <div className="flex items-center justify-between">
@@ -82,7 +89,10 @@ export default function Main({
               {/* <span className="font-medium text-black">${servicio.precio}</span> */}
             </div>
 
-            <button className="w-full mt-4 bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+            <button
+              onClick={() => handleRouter(`/business/${servicio.id}`)}
+              className="w-full mt-4 bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+            >
               Reservar
             </button>
           </div>

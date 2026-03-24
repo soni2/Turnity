@@ -3,7 +3,8 @@ import { useState } from "react";
 import { SearchIcon } from "../Components/Icons";
 import SideBar from "../Components/SideBar";
 import Main from "../Components/Main";
-import { HeaderTwo } from "../Components/Header";
+import Header from "../Components/Header";
+import Footer from "../Components/Footer";
 
 export default function Home() {
   const [busqueda, setBusqueda] = useState("");
@@ -98,21 +99,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header con búsqueda */}
-      <HeaderTwo />
-      {/* <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar servicios, estilistas..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-            />
-          </div>
-        </div>
-      </div> */}
+      <Header variant="app" />
 
       {/* Contenido principal con sidebar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -165,6 +152,7 @@ export default function Home() {
           </div>
         </div>
       </div> */}
+      <Footer />
     </div>
   );
 }

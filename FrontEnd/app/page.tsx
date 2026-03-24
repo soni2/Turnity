@@ -1,3 +1,4 @@
+"use client";
 import Hero from "./Components/Hero";
 import Section from "./Components/Section";
 // import Clients from "./Components/Clients";
@@ -9,8 +10,11 @@ import { RegisterIcon, SearchIcon, TickIcon } from "./Components/Icons";
 import Faqs from "./Components/Faqs";
 import Header from "./Components/Header";
 import Footer from "./Components/Footer";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+
   const testimonios = [
     {
       texto:
@@ -76,6 +80,10 @@ export default function Home() {
       img: "/func3.jpg",
     },
   ];
+
+  function handleRouter(path: string) {
+    router.push(path);
+  }
 
   return (
     <div>
@@ -157,10 +165,16 @@ export default function Home() {
         background="purple"
         gridMd="md:grid-cols-2"
       >
-        <Buttons className="w-full bg-black border-2 border-black">
+        <Buttons
+          onClick={() => handleRouter("/login")}
+          className="w-full bg-black border-2 border-black"
+        >
           Iniciar ahora
         </Buttons>
-        <Buttons className="w-full border-2 border-white">
+        <Buttons
+          onClick={() => handleRouter("/register")}
+          className="w-full border-2 border-white"
+        >
           Crea una cuenta gratis
         </Buttons>
       </Section>
