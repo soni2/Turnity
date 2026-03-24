@@ -7,6 +7,13 @@ import {
   HorarioDia,
   CampoHorarios,
 } from "../types/registroNegocio";
+import Paso1InfoBasica from "../components/Paso1InfoBasica";
+import Paso2Ubicacion from "../components/Paso2Ubicacion";
+import Paso3Horarios from "../components/Paso3Horarios";
+import Paso4Servicios from "../components/Paso4Servicios";
+import Paso5Equipo from "../components/Paso5Equipo";
+import Paso6Fotos from "../components/Paso6Fotos";
+import Paso7Pagos from "../components/Paso7Pagos";
 
 export default function useRegistrationBusiness() {
   const [paso, setPaso] = useState(1);
@@ -62,6 +69,34 @@ export default function useRegistrationBusiness() {
       transferencia: false,
     },
   });
+
+  const renderPaso = () => {
+    switch (paso) {
+      case 1:
+        return <Paso1InfoBasica />;
+
+      case 2:
+        return <Paso2Ubicacion />;
+
+      case 3:
+        return <Paso3Horarios />;
+
+      case 4:
+        return <Paso4Servicios />;
+
+      case 5:
+        return <Paso5Equipo />;
+
+      case 6:
+        return <Paso6Fotos />;
+
+      case 7:
+        return <Paso7Pagos />;
+
+      default:
+        return null;
+    }
+  };
 
   const handleUbicacionChange = (
     lat: number,
@@ -243,5 +278,6 @@ export default function useRegistrationBusiness() {
     setPaso,
     setTipoHorario,
     setFormData,
+    renderPaso,
   };
 }

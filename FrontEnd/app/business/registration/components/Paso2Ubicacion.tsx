@@ -1,7 +1,8 @@
 "use client";
-
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
-import MapSelection from "../MapSelection";
+import dynamic from "next/dynamic";
+
+const MapSelection = dynamic(() => import("../MapSelection"), { ssr: false });
 
 export default function Paso2Ubicacion() {
   const {
