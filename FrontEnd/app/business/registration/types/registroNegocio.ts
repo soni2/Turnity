@@ -52,7 +52,7 @@ export type FormData = {
   // Paso 2
   direccion: string;
   ciudad: string;
-  sector: string;
+  // sector: string;
   coordenadas: string;
 
   // Paso 3

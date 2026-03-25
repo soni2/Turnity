@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { Titles } from "@/app/Components/Titles";
 import BusinessForm from "./components/BusinessForm";
-import ProgressBar from "./components/ProgressBar";
 
 export default function RegistroNegocioPage() {
   // if (negocioCreado) {

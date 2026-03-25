@@ -6,6 +6,7 @@ import { SearchIcon } from "./Icons";
 import Link from "next/link";
 import { Buttons } from "./Buttons";
 import { useRouter } from "next/navigation";
+import { IconSearch } from "@tabler/icons-react";
 
 type HeaderProps = {
   variant?: "home" | "app";
@@ -44,20 +45,31 @@ export default function Header({ variant = "home" }: HeaderProps) {
     >
       <div className="md:max-w-[1200px] mx-auto flex items-center justify-between gap-4">
         {/* 🔷 Logo */}
-        <Logo
-          className={`${solid ? "fill-white" : "fill-[var(--primary)]"} h-8`}
-        />
+        <Link href="/index" className="flex items-center gap-2">
+          <Logo
+            className={`${solid ? "fill-white" : "fill-[var(--primary)]"} h-7`}
+          />
+        </Link>
 
         {/* 🎯 Navegación central (App) */}
         {!isHome && (
           <div className="hidden lg:flex items-center space-x-12 absolute left-1/2 transform -translate-x-1/2">
-            <Link href="/explore" className="font-bold text-lg hover:opacity-80 transition-opacity">
+            <Link
+              href="/explore"
+              className="font-bold text-lg hover:opacity-80 transition-opacity"
+            >
               Inicio
             </Link>
-            <Link href="/agenda" className="font-medium hover:opacity-80 transition-opacity">
+            <Link
+              href="/agenda"
+              className="font-medium hover:opacity-80 transition-opacity"
+            >
               Agenda
             </Link>
-            <Link href="/user" className="font-medium hover:opacity-80 transition-opacity">
+            <Link
+              href="/user"
+              className="font-medium hover:opacity-80 transition-opacity"
+            >
               Perfil
             </Link>
           </div>

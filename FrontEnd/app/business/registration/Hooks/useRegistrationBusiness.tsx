@@ -14,6 +14,7 @@ import Paso4Servicios from "../components/Paso4Servicios";
 import Paso5Equipo from "../components/Paso5Equipo";
 import Paso6Fotos from "../components/Paso6Fotos";
 import Paso7Pagos from "../components/Paso7Pagos";
+import { createClient } from "@/lib/supabase/client";
 
 export default function useRegistrationBusiness() {
   const [paso, setPaso] = useState(1);
@@ -24,6 +25,7 @@ export default function useRegistrationBusiness() {
     lat: 18.4861,
     lng: -69.9312,
   });
+
   const [direccionMapa, setDireccionMapa] = useState("");
   const [formData, setFormData] = useState<FormData>({
     // Paso 1: Información básica
@@ -36,7 +38,7 @@ export default function useRegistrationBusiness() {
     // Paso 2: Ubicación
     direccion: "",
     ciudad: "Santo Domingo",
-    sector: "",
+    // sector: "",
     coordenadas: "",
 
     // Paso 3: Horarios
@@ -127,14 +129,6 @@ export default function useRegistrationBusiness() {
     "Otro",
   ];
 
-  const ciudades = [
-    "Santo Domingo",
-    "Santiago",
-    "La Vega",
-    "Puerto Plata",
-    "Punta Cana",
-  ];
-
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -203,6 +197,10 @@ export default function useRegistrationBusiness() {
     }));
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+  };
+
   const agregarProfesional = () => {
     const nuevoId = Math.max(...formData.profesionales.map((p) => p.id)) + 1;
     setFormData((prev) => ({
@@ -246,12 +244,31 @@ export default function useRegistrationBusiness() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Aquí iría la lógica para enviar los datos al backend
-    console.log("Datos del negocio:", formData);
-    setNegocioCreado(true);
-  };
+  // const handleSubmit = () => {
+  //   const supabase = createClient();
+  //   const { data, error } = supabase.from("negocios").insert({
+  //     nombre: formData.nombreNegocio,
+  //     categoria: formData.categoria,
+  //     email: formData.email,
+  //     telefono: formData.telefono,
+  //     sitio_web: formData.sitioWeb,
+  //     direccion: formData.direccion,
+  //     ciudad: formData.ciudad,
+  //     sector: formData.sector,
+  //     coordenadas: formData.coordenadas,
+  //     horarios: formData.horarios,
+  //     servicios: formData.servicios,
+  //     dueno_id:
+  //   });
+
+  //   if (error) {
+  //     console.error("Error al crear el negocio:", error);
+  //   }
+  //   // e.preventDefault();
+  //   // // Aquí iría la lógica para enviar los datos al backend
+  //   // console.log("Datos del negocio:", formData);
+  //   // setNegocioCreado(true);
+  // };
 
   return {
     paso,
@@ -262,11 +279,11 @@ export default function useRegistrationBusiness() {
     handleUbicacionChange,
     negocioCreado,
     categorias,
-    ciudades,
     handleChange,
     handleHorarioChange,
     handleServicioChange,
     agregarServicio,
+    handleSubmit,
     eliminarServicio,
     handleProfesionalChange,
     agregarProfesional,
@@ -274,7 +291,6 @@ export default function useRegistrationBusiness() {
     handleFotoChange,
     eliminarFoto,
     handleLogoChange,
-    handleSubmit,
     setPaso,
     setTipoHorario,
     setFormData,

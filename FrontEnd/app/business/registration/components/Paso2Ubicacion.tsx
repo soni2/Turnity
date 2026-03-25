@@ -5,56 +5,14 @@ import dynamic from "next/dynamic";
 const MapSelection = dynamic(() => import("../MapSelection"), { ssr: false });
 
 export default function Paso2Ubicacion() {
-  const {
-    formData,
-    handleUbicacionChange,
-    coordenadasMapa,
-    direccionMapa,
-    ciudades,
-    handleChange,
-  } = useRegistrationBusiness();
+  const { formData, handleUbicacionChange, coordenadasMapa, direccionMapa } =
+    useRegistrationBusiness();
 
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold">Ubicación</h2>
         <p className="text-gray-600">¿Dónde se encuentra tu negocio?</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Ciudad *
-          </label>
-          <select
-            name="ciudad"
-            value={formData.ciudad}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-            required
-          >
-            {ciudades.map((ciudad) => (
-              <option key={ciudad} value={ciudad}>
-                {ciudad}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Sector/Barrio *
-          </label>
-          <input
-            type="text"
-            name="sector"
-            value={formData.sector}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-            placeholder="Ej: Piantini, Naco, Gazcue"
-            required
-          />
-        </div>
       </div>
 
       {/* Mapa de selección */}

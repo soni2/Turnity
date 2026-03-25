@@ -115,57 +115,10 @@ export default function MapSelection({
     }
   };
 
-  const buscarDireccion = async () => {
-    if (!direccionBuscada.trim()) return;
-
-    try {
-      setBuscando(true);
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          direccionBuscada + ", Santo Domingo, República Dominicana",
-        )}&limit=1`,
-      );
-      const data = await response.json();
-
-      if (data && data.length > 0) {
-        const { lat, lon, display_name } = data[0];
-        const latNum = parseFloat(lat);
-        const lngNum = parseFloat(lon);
-
-        // Centrar mapa
-        mapRef.current?.setView([latNum, lngNum], 16);
-
-        // Remover marcador anterior
-        if (markerRef.current) {
-          markerRef.current.remove();
-        }
-
-        // Crear nuevo marcador
-        const marker = L.marker([latNum, lngNum], { draggable: true }).addTo(
-          mapRef.current!,
-        );
-        markerRef.current = marker;
-
-        marker.on("dragend", async () => {
-          const position = marker.getLatLng();
-          await obtenerDireccion(position.lat, position.lng);
-        });
-
-        onUbicacionChange(latNum, lngNum, display_name);
-      } else {
-        alert("No se encontró la dirección");
-      }
-    } catch (error) {
-      console.error("Error buscando dirección:", error);
-    } finally {
-      setBuscando(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       {/* Buscador de direcciones */}
-      <div className="flex gap-2">
+      {/* <div className="flex gap-2">
         <input
           type="text"
           value={direccionBuscada}
@@ -182,7 +135,7 @@ export default function MapSelection({
         >
           {buscando ? "Buscando..." : "Buscar"}
         </button>
-      </div>
+      </div> */}
 
       {/* Mapa */}
       <div

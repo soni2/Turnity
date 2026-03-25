@@ -17,7 +17,7 @@ export default function BusinessForm() {
         {renderPaso()}
 
         {/* Navegación */}
-        <div className="flex justify-between mt-8 pt-6 border-t">
+        <div className="flex justify-between mt-8 pt-6 border-t gap-4">
           <Buttons
             onClick={() => setPaso((prev) => Math.max(1, prev - 1))}
             className={`px-6 py-3 border border-gray-300 rounded-lg font-medium transition-colors ${
