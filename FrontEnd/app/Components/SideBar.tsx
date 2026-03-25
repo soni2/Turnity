@@ -4,12 +4,16 @@ type Props = {
   categorias: string[];
   rangoPrecio: number[];
   setRangoPrecio: React.Dispatch<React.SetStateAction<number[]>>;
+  categoriaActiva: string;
+  setCategoriaActiva: React.Dispatch<React.SetStateAction<string>>;
 };
 
 export default function SideBar({
   categorias,
   rangoPrecio,
   setRangoPrecio,
+  categoriaActiva,
+  setCategoriaActiva,
 }: Props) {
   return (
     <aside className="w-64 flex-shrink-0">
@@ -21,10 +25,12 @@ export default function SideBar({
           <h4 className="font-medium text-sm text-gray-600 mb-2">Categorías</h4>
           <div className="space-y-2">
             {categorias.map((cat) => (
-              <label key={cat} className="flex items-center">
+              <label key={cat} className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  className="rounded border-gray-300 text-black focus:ring-black mr-2"
+                  checked={categoriaActiva === cat}
+                  onChange={() => setCategoriaActiva(cat)}
+                  className="rounded border-gray-300 text-black focus:ring-black mr-2 cursor-pointer"
                 />
                 <span className="text-sm text-gray-700">{cat}</span>
               </label>
@@ -87,8 +93,11 @@ export default function SideBar({
           </label>
         </div>
 
-        {/* Botón de aplicar */}
-        <button className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-800 transition-colors text-sm">
+        {/* Botón de aplicar (Opcional, los filtros aplican en tiempo real) */}
+        <button 
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-800 transition-colors text-sm"
+        >
           Aplicar filtros
         </button>
       </div>

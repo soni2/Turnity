@@ -48,23 +48,18 @@ export default function Header({ variant = "home" }: HeaderProps) {
           className={`${solid ? "fill-white" : "fill-[var(--primary)]"} h-8`}
         />
 
-        {/* 🔍 Buscador */}
+        {/* 🎯 Navegación central (App) */}
         {!isHome && (
-          // 🔹 APP (buscador completo)
-          <div className="relative w-full max-w-[500px] mx-auto">
-            <div className="relative flex items-center">
-              <input
-                type="text"
-                placeholder="Buscar servicios, estilistas..."
-                className="w-full pl-10 pr-24 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-black bg-white/90 placeholder:text-gray-500 placeholder:italic text-black"
-              />
-
-              <button className="absolute right-2 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
-                Buscar
-              </button>
-
-              <SearchIcon className="absolute left-4 h-5 w-5 text-gray-400" />
-            </div>
+          <div className="hidden lg:flex items-center space-x-12 absolute left-1/2 transform -translate-x-1/2">
+            <Link href="/explore" className="font-bold text-lg hover:opacity-80 transition-opacity">
+              Inicio
+            </Link>
+            <Link href="/agenda" className="font-medium hover:opacity-80 transition-opacity">
+              Agenda
+            </Link>
+            <Link href="/user" className="font-medium hover:opacity-80 transition-opacity">
+              Perfil
+            </Link>
           </div>
         )}
 

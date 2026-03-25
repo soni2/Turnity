@@ -2,11 +2,18 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 export default function CentroPage() {
+  const params = useParams();
+  const id = params.id as string;
+
+  const [centro, setCentro] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [favorito, setFavorito] = useState(false);
   const [selectedDay, setSelectedDay] = useState("lun");
-  const [selectedService, setSelectedService] = useState<number | null>(null);
+  const [selectedService, setSelectedService] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [isMobile, setIsMobile] = useState(false);
 
@@ -22,83 +29,75 @@ export default function CentroPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Datos del centro (basado en la imagen)
-  const centro = {
-    id: 1,
-    nombre: "La Esquina del Flow Barber Shop",
-    categoria: "Barbería",
-    rating: 5.0,
-    reviews: 128,
-    direccion: "Calle Principal #123, Santo Domingo",
-    telefono: "+1 809-555-0123",
-    horario: "Lun - Sáb: 9:00 AM - 8:00 PM",
-    descripcion:
-      "Barbería profesional especializada en cortes modernos y tradicionales. Ambiente único y estilistas expertos.",
-    imagenes: [
-      "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=800&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=800&auto=format&fit=crop",
-    ],
-    servicios: [
-      {
-        id: 1,
-        nombre: "Corte de cabello",
-        descripcion: "Corte clásico o moderno",
-        precio: 25,
-        duracion: "45 min",
+  // Fetch de los datos del centro
+  useEffect(() => {
+    async function fetchCentroData() {
+      const supabase = createClient();
+
+      // 1. Obtener datos del negocio
+      const { data: negocio, error: negocioError } = await supabase
+        .from("negocio")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (negocioError) {
+        console.error("Error fetching negocio:", negocioError);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Obtener servicios
+      const { data: servicios, error: serviciosError } = await supabase
+        .from("servicio")
+        .select("*")
+        .eq("negocio_id", id)
+        .eq("activo", true);
+
+      // 3. Obtener empleados
+      const { data: empleados, error: empleadosError } = await supabase
+        .from("empleado")
+        .select(`
+          id,
+          biografia,
+          foto_url,
+          usuario:usuario_id (nombre)
+        `)
+        .eq("negocio_id", id)
+        .eq("activo", true);
+
+      const formattedCentro = {
+        ...negocio,
+        categoria: negocio.categoria || "Barbería",
         rating: 5.0,
-        disponible: true,
-      },
-      {
-        id: 2,
-        nombre: "Afeitado tradicional",
-        descripcion: "Con toalla caliente y navaja",
-        precio: 20,
-        duracion: "30 min",
-        rating: 5.0,
-        disponible: true,
-      },
-      {
-        id: 3,
-        nombre: "Barba y bigote",
-        descripcion: "Diseño y perfilado",
-        precio: 15,
-        duracion: "30 min",
-        rating: 5.0,
-        disponible: true,
-      },
-      {
-        id: 4,
-        nombre: "Corte + Barba",
-        descripcion: "Combo completo",
-        precio: 35,
-        duracion: "75 min",
-        rating: 5.0,
-        disponible: false,
-      },
-    ],
-    profesionales: [
-      {
-        id: 1,
-        nombre: "Carlos Méndez",
-        especialidad: "Cortes modernos",
-        rating: 5.0,
-      },
-      {
-        id: 2,
-        nombre: "Juan Pérez",
-        especialidad: "Afeitado tradicional",
-        rating: 5.0,
-      },
-    ],
-    horariosDisponibles: {
-      lun: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-      mar: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-      mie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-      jue: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-      vie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-      sab: ["9:00", "10:00", "11:00", "12:00", "13:00"],
-    },
-  };
+        reviews: 128,
+        horario: "Lun - Sáb: 9:00 AM - 8:00 PM",
+        imagenes: [
+          "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=800&auto=format&fit=crop",
+        ],
+        servicios: servicios || [],
+        profesionales: (empleados as any[] || []).map((e) => ({
+          id: e.id,
+          nombre: e.usuario?.nombre || "Profesional",
+          especialidad: "Estilista experto",
+          rating: 5.0,
+        })),
+        horariosDisponibles: {
+          lun: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          mar: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          mie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          jue: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          vie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          sab: ["9:00", "10:00", "11:00", "12:00", "13:00"],
+        },
+      };
+
+      setCentro(formattedCentro);
+      setLoading(false);
+    }
+
+    if (id) fetchCentroData();
+  }, [id]);
 
   const diasSemana = [
     { id: "lun", nombre: "Lun" },
@@ -128,6 +127,76 @@ export default function CentroPage() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl font-semibold">Cargando perfil del negocio...</p>
+      </div>
+    );
+  }
+
+  if (!centro) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-center p-4">
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Negocio no encontrado</h2>
+          <Link href="/explore" className="text-blue-600 hover:underline">
+            Volver a la exploración
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const handleReserva = async () => {
+    if (!selectedService || !selectedTime || !centro) return;
+
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Debes iniciar sesión para reservar.");
+      return;
+    }
+
+    // Calcular fecha (el próximo día de la semana seleccionado)
+    const hoy = new Date();
+    const dias = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"];
+    const targetDayIndex = dias.indexOf(selectedDay);
+    const diff = (targetDayIndex + 7 - hoy.getDay()) % 7;
+    const fechaReserva = new Date(hoy);
+    fechaReserva.setDate(hoy.getDate() + (diff === 0 ? 7 : diff));
+
+    // Obtener info del servicio para la duración
+    const servicio = centro.servicios.find((s: any) => s.id === selectedService);
+    const profesional = centro.profesionales[0]; // Tomar el primero por ahora
+
+    if (!profesional) {
+      alert("No hay profesionales disponibles para este negocio.");
+      return;
+    }
+
+    const { error } = await supabase.from("turno").insert({
+      cliente_id: user.id,
+      empleado_id: profesional.id,
+      servicio_id: selectedService,
+      fecha: fechaReserva.toISOString().split("T")[0],
+      hora_inicio: selectedTime,
+      estado: "pendiente",
+    });
+
+    if (error) {
+      console.error("Error al reservar:", error);
+      alert("Hubo un error al procesar tu reserva. Inténtalo de nuevo.");
+    } else {
+      alert("¡Reserva confirmada con éxito!");
+      setSelectedService(null);
+      setSelectedTime("");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header con navegación */}
@@ -136,7 +205,7 @@ export default function CentroPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Link
-                href="/busqueda"
+                href="/explore"
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 {/* <ChevronLeftIcon className="h-5 w-5" /> */}
@@ -224,7 +293,7 @@ export default function CentroPage() {
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
               <h3 className="font-semibold text-lg mb-4">Servicios</h3>
               <div className="space-y-4">
-                {centro.servicios.map((servicio) => (
+                {centro.servicios.map((servicio: any) => (
                   <div
                     key={servicio.id}
                     className={`border rounded-lg p-4 cursor-pointer transition-all ${
@@ -273,7 +342,7 @@ export default function CentroPage() {
                 Nuestros Estilistas
               </h3>
               <div className="grid grid-cols-2 gap-4">
-                {centro.profesionales.map((pro) => (
+                {centro.profesionales.map((pro: any) => (
                   <div
                     key={pro.id}
                     className="flex items-center p-3 border rounded-lg"
@@ -307,7 +376,7 @@ export default function CentroPage() {
                   <p className="text-sm text-gray-500">Servicio seleccionado</p>
                   <p className="font-medium">
                     {
-                      centro.servicios.find((s) => s.id === selectedService)
+                      centro.servicios.find((s: any) => s.id === selectedService)
                         ?.nombre
                     }
                   </p>
@@ -362,7 +431,7 @@ export default function CentroPage() {
                     <option value="">Selecciona una hora</option>
                     {centro.horariosDisponibles[
                       selectedDay as keyof typeof centro.horariosDisponibles
-                    ]?.map((hora) => (
+                    ]?.map((hora: any) => (
                       <option key={hora} value={hora}>
                         {hora}
                       </option>
@@ -374,7 +443,7 @@ export default function CentroPage() {
                     <div className="grid grid-cols-3 gap-2">
                       {centro.horariosDisponibles[
                         selectedDay as keyof typeof centro.horariosDisponibles
-                      ]?.map((hora) => (
+                      ]?.map((hora: any) => (
                         <button
                           key={hora}
                           onClick={() => setSelectedTime(hora)}
@@ -399,6 +468,7 @@ export default function CentroPage() {
 
               {/* Botón de reserva */}
               <button
+                onClick={handleReserva}
                 disabled={!selectedService || !selectedTime}
                 className={`w-full py-3 rounded-lg font-medium transition-colors ${
                   selectedService && selectedTime
