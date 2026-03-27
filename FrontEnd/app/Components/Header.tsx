@@ -5,8 +5,10 @@ import Logo from "./Logo";
 import { SearchIcon } from "./Icons";
 import Link from "next/link";
 import { Buttons } from "./Buttons";
-import { useRouter } from "next/navigation";
-import { IconSearch } from "@tabler/icons-react";
+import { useRouter, usePathname } from "next/navigation";
+import { IconSearch, IconLogout } from "@tabler/icons-react";
+import { createClient } from "@/lib/supabase/client";
+import { auth } from "@/lib/auth";
 
 type HeaderProps = {
   variant?: "home" | "app";
@@ -14,6 +16,8 @@ type HeaderProps = {
 
 export default function Header({ variant = "home" }: HeaderProps) {
   const [isFixed, setIsFixed] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const supabase = createClient();
 
   const isHome = variant === "home";
   const solid = !isHome || isFixed;
@@ -30,6 +34,23 @@ export default function Header({ variant = "home" }: HeaderProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isHome]);
 
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
   // 🎨 estilos dinámicos
   const navStyles = solid
     ? "bg-[var(--primary)]"
@@ -38,6 +59,9 @@ export default function Header({ variant = "home" }: HeaderProps) {
   const textStyles = solid ? "text-white" : "text-[var(--primary)]";
 
   const router = useRouter();
+  const pathname = usePathname();
+
+  const isActive = (path: string) => pathname === path;
 
   return (
     <nav
@@ -56,42 +80,62 @@ export default function Header({ variant = "home" }: HeaderProps) {
           <div className="hidden lg:flex items-center space-x-12 absolute left-1/2 transform -translate-x-1/2">
             <Link
               href="/explore"
-              className="font-bold text-lg hover:opacity-80 transition-opacity"
+              className={`${
+                isActive("/explore") ? "font-bold text-lg" : "font-medium"
+              } hover:opacity-80 transition-opacity`}
             >
               Inicio
             </Link>
             <Link
               href="/agenda"
-              className="font-medium hover:opacity-80 transition-opacity"
+              className={`${
+                isActive("/agenda") ? "font-bold text-lg" : "font-medium"
+              } hover:opacity-80 transition-opacity`}
             >
               Agenda
             </Link>
             <Link
               href="/user"
-              className="font-medium hover:opacity-80 transition-opacity"
+              className={`${
+                isActive("/user") ? "font-bold text-lg" : "font-medium"
+              } hover:opacity-80 transition-opacity`}
             >
               Perfil
             </Link>
           </div>
         )}
 
-        {/* 🎯 Acciones (solo en home) */}
-        {isHome && (
-          <div className="flex items-center space-x-4">
-            <Buttons onClick={() => router.push("/login")} className="p-0">
-              Iniciar sesión
-            </Buttons>
-            <Link href="/register">
-              <span
-                className={`uppercase font-bold ${
-                  solid ? "text-white" : "text-[var(--primary)]"
-                }`}
-              >
-                Registrar
-              </span>
-            </Link>
-          </div>
-        )}
+        {/* 🎯 Acciones */}
+        <div className="flex items-center space-x-4">
+          {isHome && !user && (
+            <>
+              <Buttons onClick={() => router.push("/login")} className="p-0">
+                Iniciar sesión
+              </Buttons>
+              <Link href="/register">
+                <span
+                  className={`uppercase font-bold ${
+                    solid ? "text-white" : "text-[var(--primary)]"
+                  }`}
+                >
+                  Registrar
+                </span>
+              </Link>
+            </>
+          )}
+          {user && (
+            <button
+              onClick={async () => {
+                await auth.logout();
+                router.push("/login");
+              }}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              title="Cerrar sesión"
+            >
+              <IconLogout size={24} />
+            </button>
+          )}
+        </div>
       </div>
     </nav>
   );

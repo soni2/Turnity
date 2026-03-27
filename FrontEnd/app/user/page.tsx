@@ -15,11 +15,22 @@ export default async function InformacionUsuarioPage() {
     .eq("id", user?.id)
     .single();
 
-  // console.log(user);
-  if (!user) {
-    return <p>No estás autenticado. Por favor, inicia sesión.</p>;
-  }
-  // const { data: profile, error } = await supabase.from("Usuario").select("*");
+  const { data: turnos } = await supabase
+    .from("turno")
+    .select(`
+      id,
+      fecha,
+      hora_inicio,
+      estado,
+      servicio:servicio_id (
+        nombre,
+        negocio:negocio_id (
+          nombre
+        )
+      )
+    `)
+    .eq("cliente_id", user?.id)
+    .order("fecha", { ascending: false });
 
   return (
     <UserData
@@ -31,6 +42,7 @@ export default async function InformacionUsuarioPage() {
       profilePicture={profile?.avatar_url}
       biography={profile?.biography}
       direction={profile?.direccion}
+      citas={turnos || []}
     />
   );
 }

@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Header from "../../Components/Header";
 
 export default function CentroPage() {
   const params = useParams();
@@ -12,10 +13,16 @@ export default function CentroPage() {
   const [centro, setCentro] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [favorito, setFavorito] = useState(false);
-  const [selectedDay, setSelectedDay] = useState("lun");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [isMobile, setIsMobile] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    isError: false,
+    title: "",
+    message: "",
+  });
 
   // Detectar si es móvil
   useEffect(() => {
@@ -75,7 +82,7 @@ export default function CentroPage() {
         imagenes: [
           "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=800&auto=format&fit=crop",
         ],
-        servicios: servicios || [],
+        servicios: (servicios || []).map(s => ({ ...s, disponible: true })),
         profesionales: (empleados as any[] || []).map((e) => ({
           id: e.id,
           nombre: e.usuario?.nombre || "Profesional",
@@ -99,14 +106,37 @@ export default function CentroPage() {
     if (id) fetchCentroData();
   }, [id]);
 
-  const diasSemana = [
-    { id: "lun", nombre: "Lun" },
-    { id: "mar", nombre: "Mar" },
-    { id: "mie", nombre: "Mié" },
-    { id: "jue", nombre: "Jue" },
-    { id: "vie", nombre: "Vie" },
-    { id: "sab", nombre: "Sáb" },
-  ];
+  const upcomingDates = useMemo(() => {
+    if (!centro) return [];
+    const dates = [];
+    const today = new Date();
+    const mapDayToKey: Record<number, string> = { 0: "dom", 1: "lun", 2: "mar", 3: "mie", 4: "jue", 5: "vie", 6: "sab" };
+    const mapDayToDisplay = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+    const mapMonthToDisplay = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    
+    for (let i = 0; i < 14; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const key = mapDayToKey[d.getDay()];
+        
+        const availableTimes = centro.horariosDisponibles[key as keyof typeof centro.horariosDisponibles];
+        if (availableTimes && availableTimes.length > 0) {
+            dates.push({
+                dateString: d.toISOString().split("T")[0],
+                key,
+                displayDay: mapDayToDisplay[d.getDay()],
+                displayNum: d.getDate(),
+                displayMonth: mapMonthToDisplay[d.getMonth()]
+            });
+        }
+    }
+    return dates;
+  }, [centro]);
+
+  const selectedDateObj = upcomingDates.find((d) => d.dateString === selectedDate);
+  const availableTimesForSelectedDate = selectedDateObj
+    ? centro.horariosDisponibles[selectedDateObj.key as keyof typeof centro.horariosDisponibles]
+    : [];
 
   const renderStars = (rating: number) => {
     return (
@@ -149,7 +179,7 @@ export default function CentroPage() {
   }
 
   const handleReserva = async () => {
-    if (!selectedService || !selectedTime || !centro) return;
+    if (!selectedService || !selectedTime || !centro || !selectedDate) return;
 
     const supabase = createClient();
     const {
@@ -157,24 +187,16 @@ export default function CentroPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      alert("Debes iniciar sesión para reservar.");
+      setModalConfig({ isOpen: true, isError: true, title: "Inicia sesión", message: "Debes iniciar sesión para reservar." });
       return;
     }
-
-    // Calcular fecha (el próximo día de la semana seleccionado)
-    const hoy = new Date();
-    const dias = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"];
-    const targetDayIndex = dias.indexOf(selectedDay);
-    const diff = (targetDayIndex + 7 - hoy.getDay()) % 7;
-    const fechaReserva = new Date(hoy);
-    fechaReserva.setDate(hoy.getDate() + (diff === 0 ? 7 : diff));
 
     // Obtener info del servicio para la duración
     const servicio = centro.servicios.find((s: any) => s.id === selectedService);
     const profesional = centro.profesionales[0]; // Tomar el primero por ahora
 
     if (!profesional) {
-      alert("No hay profesionales disponibles para este negocio.");
+      setModalConfig({ isOpen: true, isError: true, title: "Sin profesionales", message: "No hay profesionales disponibles para este negocio." });
       return;
     }
 
@@ -182,25 +204,26 @@ export default function CentroPage() {
       cliente_id: user.id,
       empleado_id: profesional.id,
       servicio_id: selectedService,
-      fecha: fechaReserva.toISOString().split("T")[0],
+      fecha: selectedDate,
       hora_inicio: selectedTime,
       estado: "pendiente",
     });
 
     if (error) {
       console.error("Error al reservar:", error);
-      alert("Hubo un error al procesar tu reserva. Inténtalo de nuevo.");
+      setModalConfig({ isOpen: true, isError: true, title: "Error en la reserva", message: "Hubo un error al procesar tu reserva. Inténtalo de nuevo." });
     } else {
-      alert("¡Reserva confirmada con éxito!");
+      setModalConfig({ isOpen: true, isError: false, title: "¡Reserva confirmada!", message: "Tu cita ha sido agendada con éxito." });
       setSelectedService(null);
       setSelectedTime("");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-[64px]">
+      <Header variant="app" />
       {/* Header con navegación */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-white border-b sticky top-[64px] z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -298,7 +321,7 @@ export default function CentroPage() {
                     key={servicio.id}
                     className={`border rounded-lg p-4 cursor-pointer transition-all ${
                       selectedService === servicio.id
-                        ? "border-black ring-2 ring-black ring-opacity-20"
+                        ? "border-[var(--primary)] ring-2 ring-[var(--primary)] ring-opacity-20"
                         : "border-gray-200 hover:border-gray-300"
                     } ${!servicio.disponible ? "opacity-50" : ""}`}
                     onClick={() =>
@@ -322,7 +345,7 @@ export default function CentroPage() {
                       </div>
                       <div className="text-right">
                         <span className="font-semibold text-lg">
-                          ${servicio.precio}
+                          RD${servicio.precio}
                         </span>
                         {!servicio.disponible && (
                           <p className="text-xs text-red-500 mt-1">
@@ -389,20 +412,22 @@ export default function CentroPage() {
                   Selecciona un día
                 </label>
                 <div className="flex space-x-2 overflow-x-auto pb-2">
-                  {diasSemana.map((dia) => (
+                  {upcomingDates.map((dia) => (
                     <button
-                      key={dia.id}
+                      key={dia.dateString}
                       onClick={() => {
-                        setSelectedDay(dia.id);
+                        setSelectedDate(dia.dateString);
                         setSelectedTime(""); // Resetear hora al cambiar día
                       }}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                        selectedDay === dia.id
-                          ? "bg-black text-white"
+                      className={`px-4 py-2 rounded-lg text-sm font-medium flex flex-col items-center justify-center min-w-[70px] whitespace-nowrap transition-colors ${
+                        selectedDate === dia.dateString
+                          ? "bg-[var(--primary)] text-white"
                           : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
                     >
-                      {dia.nombre}
+                      <span className="text-xs uppercase mb-1">{dia.displayDay}</span>
+                      <span className="text-lg font-bold">{dia.displayNum}</span>
+                      <span className="text-xs">{dia.displayMonth}</span>
                     </button>
                   ))}
                 </div>
@@ -429,9 +454,7 @@ export default function CentroPage() {
                     }}
                   >
                     <option value="">Selecciona una hora</option>
-                    {centro.horariosDisponibles[
-                      selectedDay as keyof typeof centro.horariosDisponibles
-                    ]?.map((hora: any) => (
+                    {availableTimesForSelectedDate?.map((hora: any) => (
                       <option key={hora} value={hora}>
                         {hora}
                       </option>
@@ -441,16 +464,14 @@ export default function CentroPage() {
                   // Botones de selección única para desktop
                   <div>
                     <div className="grid grid-cols-3 gap-2">
-                      {centro.horariosDisponibles[
-                        selectedDay as keyof typeof centro.horariosDisponibles
-                      ]?.map((hora: any) => (
+                      {availableTimesForSelectedDate?.map((hora: any) => (
                         <button
                           key={hora}
                           onClick={() => setSelectedTime(hora)}
                           className={`px-3 py-2 text-sm border rounded-lg transition-colors ${
                             selectedTime === hora
-                              ? "bg-black text-white border-black"
-                              : "hover:border-black"
+                              ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                              : "hover:border-[var(--primary)] text-gray-700"
                           }`}
                         >
                           {hora}
@@ -472,7 +493,7 @@ export default function CentroPage() {
                 disabled={!selectedService || !selectedTime}
                 className={`w-full py-3 rounded-lg font-medium transition-colors ${
                   selectedService && selectedTime
-                    ? "bg-black text-white hover:bg-gray-800"
+                    ? "bg-[var(--primary)] text-white hover:opacity-90 cursor-pointer"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }`}
               >
@@ -491,6 +512,41 @@ export default function CentroPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmación */}
+      {modalConfig.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-xl">
+            {modalConfig.isError ? (
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
+                <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+            ) : (
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
+                <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            )}
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              {modalConfig.title}
+            </h3>
+            <div className="text-sm text-gray-500 mb-8">
+              <p>{modalConfig.message}</p>
+            </div>
+            <button
+              onClick={() => setModalConfig({ ...modalConfig, isOpen: false })}
+              className={`w-full py-3 rounded-xl font-semibold transition-colors text-white ${
+                modalConfig.isError ? "bg-red-600 hover:bg-red-700" : "bg-[var(--primary)] hover:opacity-90"
+              }`}
+            >
+              Aceptar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
