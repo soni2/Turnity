@@ -5,7 +5,6 @@ export async function POST(request: Request) {
   try {
     const { negocioId, fotosUrls } = await request.json();
 
-    // 1. Validaciones básicas
     if (!negocioId || !fotosUrls || !Array.isArray(fotosUrls)) {
       return NextResponse.json(
         { error: "Faltan parámetros: negocioId o fotosUrls" },
@@ -13,12 +12,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Actualizar la columna 'fotos' con el array de URLs en formato JSON
     const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("negocio")
-      .update({ fotos: fotosUrls }) // Se almacena como JSON (array de strings)
+      .update({ fotos: fotosUrls }) 
       .eq("id", negocioId)
       .select();
 
