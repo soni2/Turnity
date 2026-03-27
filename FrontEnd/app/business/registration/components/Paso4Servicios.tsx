@@ -1,11 +1,19 @@
 "use client";
 
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
+import { FormData } from "../types/registroNegocio";
 
-export default function Paso4Servicios() {
-  const { formData, handleServicioChange, agregarServicio, eliminarServicio } =
-    useRegistrationBusiness();
-
+export default function Paso4Servicios({
+  formData,
+  handleServicioChange,
+  agregarServicio,
+  eliminarServicio,
+}: {
+  formData: FormData;
+  handleServicioChange: (id: number, campo: string, valor: string) => void;
+  agregarServicio: () => void;
+  eliminarServicio: (id: number) => void;
+}) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">

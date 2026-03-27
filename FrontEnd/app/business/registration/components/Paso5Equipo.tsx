@@ -1,13 +1,17 @@
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
+import { FormData } from "../types/registroNegocio";
 
-export default function Paso5Equipo() {
-  const {
-    formData,
-    handleProfesionalChange,
-    agregarProfesional,
-    eliminarProfesional,
-  } = useRegistrationBusiness();
-
+export default function Paso5Equipo({
+  formData,
+  handleProfesionalChange,
+  agregarProfesional,
+  eliminarProfesional,
+}: {
+  formData: FormData;
+  handleProfesionalChange: (id: number, campo: string, valor: string) => void;
+  agregarProfesional: () => void;
+  eliminarProfesional: (id: number) => void;
+}) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">

@@ -1,8 +1,13 @@
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
+import { FormData } from "../types/registroNegocio";
 
-export default function Paso7Pagos() {
-  const { formData, setFormData } = useRegistrationBusiness();
-
+export default function Paso7Pagos({
+  formData,
+  setFormData,
+}: {
+  formData: FormData;
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
+}) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">

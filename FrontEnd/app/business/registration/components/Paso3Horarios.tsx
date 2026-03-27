@@ -1,11 +1,24 @@
 "use client";
 
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
-import { Dia, HorarioDia } from "../types/registroNegocio";
+import { CampoHorarios, Dia, HorarioDia } from "../types/registroNegocio";
+import { FormData } from "../types/registroNegocio";
 
-export default function Paso3Horarios() {
-  const { formData, handleHorarioChange, tipoHorario, setTipoHorario } =
-    useRegistrationBusiness();
+export default function Paso3Horarios({
+  formData,
+  handleHorarioChange,
+  tipoHorario,
+  setTipoHorario,
+}: {
+  formData: FormData;
+  handleHorarioChange: <K extends CampoHorarios>(
+    dia: Dia,
+    campo: K,
+    valor: HorarioDia[K],
+  ) => void;
+  tipoHorario: "continuo" | "partido";
+  setTipoHorario: (tipo: "continuo" | "partido") => void;
+}) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">

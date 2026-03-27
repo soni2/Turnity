@@ -4,7 +4,8 @@ import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
 import ProgressBar from "./ProgressBar";
 
 export default function BusinessForm() {
-  const { paso, handleSubmit, setPaso, renderPaso } = useRegistrationBusiness();
+  const { paso, handleSubmit, setPaso, renderPaso, formData, handleCreate } =
+    useRegistrationBusiness();
 
   return (
     <>
@@ -28,7 +29,7 @@ export default function BusinessForm() {
             Anterior
           </Buttons>
 
-          {paso < 7 ? (
+          {paso < 6 ? (
             <Buttons
               onClick={() => setPaso((prev) => prev + 1)}
               className=" bg-black text-white rounded-lg font-medium hover:bg-gray-800 transition-colors"
@@ -37,7 +38,7 @@ export default function BusinessForm() {
             </Buttons>
           ) : (
             <Buttons
-              type="submit"
+              onClick={handleCreate}
               className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
             >
               Completar registro

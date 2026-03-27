@@ -14,6 +14,7 @@ import Paso4Servicios from "../components/Paso4Servicios";
 import Paso5Equipo from "../components/Paso5Equipo";
 import Paso6Fotos from "../components/Paso6Fotos";
 import Paso7Pagos from "../components/Paso7Pagos";
+import { create } from "domain";
 import { createClient } from "@/lib/supabase/client";
 
 export default function useRegistrationBusiness() {
@@ -72,28 +73,66 @@ export default function useRegistrationBusiness() {
     },
   });
 
+  const [logoUp, setLogoUp] = useState<File | null>(null);
+
+  const [buttonDisabled, setButtonDisabled] = useState(false);
+
   const renderPaso = () => {
     switch (paso) {
       case 1:
-        return <Paso1InfoBasica />;
+        return (
+          <Paso1InfoBasica
+            categorias={categorias}
+            formData={formData}
+            handleChange={handleChange}
+            buttonDisabled={buttonDisabled}
+            setButtonDisabled={setButtonDisabled}
+          />
+        );
 
       case 2:
-        return <Paso2Ubicacion />;
+        return (
+          <Paso2Ubicacion
+            formData={formData}
+            handleUbicacionChange={handleUbicacionChange}
+            coordenadasMapa={coordenadasMapa}
+            direccionMapa={direccionMapa}
+          />
+        );
 
       case 3:
-        return <Paso3Horarios />;
+        return (
+          <Paso3Horarios
+            formData={formData}
+            handleHorarioChange={handleHorarioChange}
+            tipoHorario={tipoHorario}
+            setTipoHorario={setTipoHorario}
+          />
+        );
 
       case 4:
-        return <Paso4Servicios />;
+        return (
+          <Paso4Servicios
+            formData={formData}
+            handleServicioChange={handleServicioChange}
+            agregarServicio={agregarServicio}
+            eliminarServicio={eliminarServicio}
+          />
+        );
 
       case 5:
-        return <Paso5Equipo />;
+        return (
+          <Paso6Fotos
+            formData={formData}
+            setFormData={setFormData}
+            handleFotoChange={handleFotoChange}
+            handleLogoChange={handleLogoChange}
+            eliminarFoto={eliminarFoto}
+          />
+        );
 
       case 6:
-        return <Paso6Fotos />;
-
-      case 7:
-        return <Paso7Pagos />;
+        return <Paso7Pagos formData={formData} setFormData={setFormData} />;
 
       default:
         return null;
@@ -197,7 +236,7 @@ export default function useRegistrationBusiness() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
   };
 
@@ -226,7 +265,7 @@ export default function useRegistrationBusiness() {
       const filesArray = Array.from(e.target.files);
       setFormData((prev) => ({
         ...prev,
-        fotos: [...prev.fotos, ...filesArray].slice(0, 5), // Máximo 5 fotos
+        fotos: [...prev.fotos, ...filesArray].slice(0, 3),
       }));
     }
   };
@@ -239,8 +278,112 @@ export default function useRegistrationBusiness() {
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFormData((prev) => ({ ...prev, logo: e.target.files![0] }));
+    // if (e.target.files && e.target.files[0]) {
+    //   setFormData((prev) => ({ ...prev, logo: e.target.files![0] }));
+    // }
+    setLogoUp(e.target.files![0]);
+    setFormData((prev) => ({ ...prev, logo: e.target.files![0] }));
+  };
+
+  async function uploadFileToSupabase(
+    file: File,
+    path: string,
+    userId: string,
+  ) {
+    const supabase = createClient();
+
+    const { data, error } = await supabase.storage
+      .from("negocios")
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: true,
+        metadata: { userId },
+      });
+
+    if (error) {
+      console.error("Error al subir archivo:", error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("negocios")
+      .getPublicUrl(path);
+    return urlData.publicUrl;
+  }
+
+  const handleCreate = async () => {
+    try {
+      const res = await fetch("/api/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Error en el servidor:", errorText);
+        return;
+      }
+
+      const responseData = await res.json();
+      const negocio = responseData.data?.[0];
+
+      if (!negocio) {
+        console.error("No se recibió la información del negocio");
+        return;
+      }
+
+      if (logoUp) {
+        const logoUrl = await uploadFileToSupabase(
+          logoUp,
+          `/${negocio.id}/logo.png`,
+          negocio.dueno_id,
+        );
+
+        if (logoUrl) {
+          await fetch("/api/update-logo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ negocioId: negocio.id, logoUrl }),
+          })
+            .then((res) => res.json())
+            .then((res) => console.log(res));
+        }
+      }
+
+      if (formData.fotos && formData.fotos.length > 0) {
+        const fotosUrls: string[] = [];
+
+        for (let i = 0; i < formData.fotos.length; i++) {
+          const foto = formData.fotos[i];
+          const extension = foto.name.split(".").pop() || "jpg";
+          const path = `/${negocio.id}/fotos/foto_${i + 1}.${extension}`;
+
+          const fotoUrl = await uploadFileToSupabase(
+            foto,
+            path,
+            negocio.dueno_id,
+          );
+
+          if (fotoUrl) {
+            fotosUrls.push(fotoUrl);
+          }
+        }
+
+        if (fotosUrls.length > 0) {
+          await fetch("/api/update-fotos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ negocioId: negocio.id, fotosUrls }),
+          })
+            .then((res) => res.json())
+            .then((res) => console.log("Fotos actualizadas:", res));
+        }
+      }
+
+      console.log("Proceso finalizado con éxito");
+    } catch (err) {
+      console.error("Error crítico en handleCreate:", err);
     }
   };
 
@@ -276,9 +419,9 @@ export default function useRegistrationBusiness() {
     coordenadasMapa,
     direccionMapa,
     formData,
-    handleUbicacionChange,
     negocioCreado,
     categorias,
+    handleUbicacionChange,
     handleChange,
     handleHorarioChange,
     handleServicioChange,
@@ -295,5 +438,6 @@ export default function useRegistrationBusiness() {
     setTipoHorario,
     setFormData,
     renderPaso,
+    handleCreate,
   };
 }

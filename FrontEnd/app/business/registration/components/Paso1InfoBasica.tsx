@@ -1,10 +1,23 @@
 "use client";
 
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
+import { FormData } from "../types/registroNegocio";
 
-export default function Paso1InfoBasica() {
-  const { categorias, formData, handleChange } = useRegistrationBusiness();
-
+export default function Paso1InfoBasica({
+  categorias,
+  formData,
+  handleChange,
+  buttonDisabled,
+  setButtonDisabled,
+}: {
+  categorias: string[];
+  formData: FormData;
+  handleChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => void;
+  buttonDisabled: boolean;
+  setButtonDisabled: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">

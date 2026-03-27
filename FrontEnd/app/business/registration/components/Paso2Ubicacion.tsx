@@ -1,13 +1,21 @@
 "use client";
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
 import dynamic from "next/dynamic";
+import { FormData } from "../types/registroNegocio";
 
 const MapSelection = dynamic(() => import("../MapSelection"), { ssr: false });
 
-export default function Paso2Ubicacion() {
-  const { formData, handleUbicacionChange, coordenadasMapa, direccionMapa } =
-    useRegistrationBusiness();
-
+export default function Paso2Ubicacion({
+  formData,
+  handleUbicacionChange,
+  coordenadasMapa,
+  direccionMapa,
+}: {
+  formData: FormData;
+  handleUbicacionChange: (lat: number, lng: number, direccion: string) => void;
+  coordenadasMapa: { lat: number; lng: number };
+  direccionMapa: string;
+}) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">

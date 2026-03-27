@@ -1,7 +1,8 @@
 import { Titles } from "@/app/Components/Titles";
 import BusinessForm from "./components/BusinessForm";
+import { createClient } from "@/lib/supabase/server";
 
-export default function RegistroNegocioPage() {
+export default async function RegistroNegocioPage() {
   // if (negocioCreado) {
   //   return (
   //     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

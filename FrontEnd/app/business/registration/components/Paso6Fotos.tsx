@@ -1,14 +1,19 @@
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
+import { FormData } from "../types/registroNegocio";
 
-export default function Paso6Fotos() {
-  const {
-    formData,
-    handleFotoChange,
-    eliminarFoto,
-    handleLogoChange,
-    setFormData,
-  } = useRegistrationBusiness();
-
+export default function Paso6Fotos({
+  formData,
+  handleFotoChange,
+  eliminarFoto,
+  handleLogoChange,
+  setFormData,
+}: {
+  formData: FormData;
+  handleFotoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  eliminarFoto: (index: number) => void;
+  handleLogoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
+}) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
@@ -56,7 +61,7 @@ export default function Paso6Fotos() {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Fotos del local (máx. 5)
+          Fotos del local (máx. 3)
         </label>
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
           <input
