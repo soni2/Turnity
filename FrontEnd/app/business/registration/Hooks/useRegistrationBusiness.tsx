@@ -413,6 +413,44 @@ export default function useRegistrationBusiness() {
   //   // setNegocioCreado(true);
   // };
 
+  /**
+   * Valida si el paso actual tiene todos sus campos esenciales completos.
+   * Retorna true si se puede avanzar al siguiente paso.
+   */
+  const isPasoValido = (numeroPaso: number): boolean => {
+    switch (numeroPaso) {
+      case 1:
+        return (
+          formData.nombreNegocio.trim() !== "" &&
+          formData.categoria !== "" &&
+          formData.email.trim() !== "" &&
+          formData.telefono.trim() !== ""
+        );
+      case 2:
+        // Válido si el usuario hizo clic en el mapa (coordenadas no vacías)
+        return formData.coordenadas.trim() !== "";
+      case 3:
+        // Válido si al menos un día de la semana está abierto
+        return Object.values(formData.horarios).some((d) => d.abierto);
+      case 4:
+        // Cada servicio debe tener nombre, precio y duración
+        return formData.servicios.every(
+          (s) =>
+            s.nombre.trim() !== "" &&
+            s.precio.toString().trim() !== "" &&
+            s.duracion.toString().trim() !== "",
+        );
+      case 5:
+        // El logo es obligatorio para continuar
+        return formData.logo !== null;
+      case 6:
+        // Al menos un método de pago seleccionado
+        return Object.values(formData.metodosPago).some(Boolean);
+      default:
+        return true;
+    }
+  };
+
   return {
     paso,
     tipoHorario,
@@ -439,5 +477,6 @@ export default function useRegistrationBusiness() {
     setFormData,
     renderPaso,
     handleCreate,
+    isPasoValido,
   };
 }

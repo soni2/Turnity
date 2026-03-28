@@ -66,30 +66,70 @@ export default function CentroPage() {
         .eq("negocio_id", id)
         .eq("activo", true);
 
+      // Derivar texto de horario y horarios disponibles desde negocio.horarios (JSON guardado en BD)
+      const horariosRaw: Record<string, { abierto: boolean; apertura: string; cierre: string }> =
+        negocio.horarios || {};
+
+      const DIAS_MAP: Record<string, string> = {
+        lunes: "lun",
+        martes: "mar",
+        miercoles: "mie",
+        jueves: "jue",
+        viernes: "vie",
+        sabado: "sab",
+        domingo: "dom",
+      };
+
+      // Generar slots de horas en intervalos de 1h dado apertura y cierre "HH:mm"
+      function generarSlots(apertura: string, cierre: string): string[] {
+        const slots: string[] = [];
+        const [hIni, mIni] = apertura.split(":").map(Number);
+        const [hFin] = cierre.split(":").map(Number);
+        for (let h = hIni; h < hFin; h++) {
+          slots.push(`${String(h).padStart(2, "0")}:${String(mIni).padStart(2, "0")}`);
+        }
+        return slots;
+      }
+
+      const horariosDisponibles: Record<string, string[]> = {};
+      const diasAbiertos: string[] = [];
+
+      Object.entries(horariosRaw).forEach(([dia, config]) => {
+        const clave = DIAS_MAP[dia] ?? dia;
+        if (config.abierto) {
+          horariosDisponibles[clave] = generarSlots(config.apertura, config.cierre);
+          diasAbiertos.push(dia.charAt(0).toUpperCase() + dia.slice(1, 3));
+        }
+      });
+
+      const horarioTexto =
+        diasAbiertos.length > 0
+          ? `${diasAbiertos.join(" - ")}: ${horariosRaw[Object.keys(horariosRaw).find((d) => horariosRaw[d]?.abierto) ?? ""]?.apertura ?? ""} - ${horariosRaw[Object.keys(horariosRaw).find((d) => horariosRaw[d]?.abierto) ?? ""]?.cierre ?? ""}`
+          : "Sin horario registrado";
+
+      // Fotos del negocio: viene como string[] JSON desde la BD
+      const fotosNegocio: string[] = Array.isArray(negocio.fotos)
+        ? negocio.fotos
+        : [];
+
       const formattedCentro = {
         ...negocio,
-        categoria: negocio.categoria || "Barbería",
-        rating: 5.0,
-        reviews: 128,
-        horario: "Lun - Sáb: 9:00 AM - 8:00 PM",
-        imagenes: [
-          "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=800&auto=format&fit=crop",
-        ],
-        servicios: servicios || [],
-        profesionales: (empleados as any[] || []).map((e) => ({
+        categoria: negocio.categoria || "Sin categoría",
+        telefono: negocio.telefono_contacto || negocio.telefono || "Sin teléfono",
+        horario: horarioTexto,
+        imagenes: fotosNegocio,
+        servicios: (servicios || []).map((s: any) => ({
+          ...s,
+          disponible: s.activo !== false,
+        })),
+        profesionales: ((empleados as any[]) || []).map((e) => ({
           id: e.id,
           nombre: e.usuario?.nombre || "Profesional",
-          especialidad: "Estilista experto",
+          especialidad: e.biografia || "Especialista",
+          foto_url: e.foto_url || null,
           rating: 5.0,
         })),
-        horariosDisponibles: {
-          lun: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-          mar: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-          mie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-          jue: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-          vie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-          sab: ["9:00", "10:00", "11:00", "12:00", "13:00"],
-        },
+        horariosDisponibles,
       };
 
       setCentro(formattedCentro);
@@ -236,22 +276,33 @@ export default function CentroPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna izquierda - Información del centro */}
           <div className="lg:col-span-2">
-            {/* Imágenes */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {/* {centro.imagenes.map((img, idx) => (
-                <div
-                  key={idx}
-                  className="relative h-64 rounded-lg overflow-hidden"
-                >
-                  <Image
-                    src={img}
-                    alt={`${centro.nombre} - Imagen ${idx + 1}`}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              ))} */}
-            </div>
+            {/* Fotos del negocio */}
+            {centro.imagenes && centro.imagenes.length > 0 ? (
+              <div className={`grid gap-4 mb-6 ${centro.imagenes.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                {centro.imagenes.map((img: string, idx: number) => (
+                  <div
+                    key={idx}
+                    className="relative h-64 rounded-lg overflow-hidden bg-gray-100"
+                  >
+                    <Image
+                      src={img}
+                      alt={`${centro.nombre} - Foto ${idx + 1}`}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : centro.logo_url ? (
+              <div className="relative h-48 rounded-lg overflow-hidden mb-6 bg-gray-100">
+                <Image
+                  src={centro.logo_url}
+                  alt={centro.nombre}
+                  fill
+                  className="object-contain p-4"
+                />
+              </div>
+            ) : null}
 
             {/* Información básica */}
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -261,13 +312,6 @@ export default function CentroPage() {
                     {centro.categoria}
                   </span>
                   <h2 className="text-2xl font-bold mt-1">{centro.nombre}</h2>
-                </div>
-                <div className="flex items-center bg-yellow-50 px-3 py-1 rounded-full">
-                  {/* <StarIcon className="h-5 w-5 text-yellow-400 fill-yellow-400" /> */}
-                  <span className="font-semibold ml-1">{centro.rating}</span>
-                  <span className="text-sm text-gray-500 ml-1">
-                    ({centro.reviews})
-                  </span>
                 </div>
               </div>
 
@@ -347,16 +391,24 @@ export default function CentroPage() {
                     key={pro.id}
                     className="flex items-center p-3 border rounded-lg"
                   >
-                    <div className="w-12 h-12 bg-gray-200 rounded-full mr-3"></div>
+                    <div className="w-12 h-12 rounded-full mr-3 overflow-hidden bg-gray-200 shrink-0">
+                      {pro.foto_url ? (
+                        <Image
+                          src={pro.foto_url}
+                          alt={pro.nombre}
+                          width={48}
+                          height={48}
+                          className="object-cover w-full h-full"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg font-bold">
+                          {pro.nombre.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <h4 className="font-medium">{pro.nombre}</h4>
-                      <p className="text-xs text-gray-500">
-                        {pro.especialidad}
-                      </p>
-                      <div className="flex items-center mt-1">
-                        {/* <StarIcon className="h-3 w-3 text-yellow-400 fill-yellow-400" /> */}
-                        <span className="text-xs ml-1">{pro.rating}</span>
-                      </div>
+                      <p className="text-xs text-gray-500">{pro.especialidad}</p>
                     </div>
                   </div>
                 ))}
