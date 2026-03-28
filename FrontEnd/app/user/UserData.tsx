@@ -5,6 +5,14 @@ import Header from "../Components/Header";
 import MobileNav from "../Components/MobileNav";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { IconEditFilled } from "@tabler/icons-react";
+import Link from "next/link";
+
+interface Negocio {
+  id: string;
+  nombre: string;
+  logo_url: string;
+}
 
 interface UserDataProps {
   name: string;
@@ -13,9 +21,9 @@ interface UserDataProps {
   details: string;
   registerDate: string;
   profilePicture: string;
-  biography: string;
   direction: string;
   citas?: any[];
+  negocio?: Negocio[];
 }
 
 export default function UserData({
@@ -25,37 +33,51 @@ export default function UserData({
   details,
   registerDate,
   profilePicture,
-  biography,
   direction,
+  negocio,
   citas = [],
 }: UserDataProps) {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [mostrarModalNegocio, setMostrarModalNegocio] = useState(false);
   const router = useRouter();
-  const [cancelModal, setCancelModal] = useState<{isOpen: boolean, citaId: string | null, isSubmitting: boolean, error: string | null}>({
+  const [cancelModal, setCancelModal] = useState<{
+    isOpen: boolean;
+    citaId: string | null;
+    isSubmitting: boolean;
+    error: string | null;
+  }>({
     isOpen: false,
     citaId: null,
     isSubmitting: false,
-    error: null
+    error: null,
   });
 
   const handleCancelCita = async () => {
     if (!cancelModal.citaId) return;
     setCancelModal({ ...cancelModal, isSubmitting: true, error: null });
-    
+
     const supabase = createClient();
     const { error } = await supabase
       .from("turno")
       .update({ estado: "cancelado" })
       .eq("id", cancelModal.citaId);
-      
+
     if (error) {
       console.error("Error al cancelar la cita:", error);
-      setCancelModal({ ...cancelModal, isSubmitting: false, error: "Hubo un error al intentar cancelar. Inténtalo de nuevo." });
+      setCancelModal({
+        ...cancelModal,
+        isSubmitting: false,
+        error: "Hubo un error al intentar cancelar. Inténtalo de nuevo.",
+      });
       return;
     }
-    
-    setCancelModal({ isOpen: false, citaId: null, isSubmitting: false, error: null });
+
+    setCancelModal({
+      isOpen: false,
+      citaId: null,
+      isSubmitting: false,
+      error: null,
+    });
     router.refresh();
   };
 
@@ -149,20 +171,41 @@ export default function UserData({
               <div className="space-y-3">
                 {citas.length > 0 ? (
                   citas.map((cita) => (
-                    <div key={cita.id} className="flex justify-between p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={cita.id}
+                      className="flex justify-between p-3 bg-gray-50 rounded-lg"
+                    >
                       <div>
-                        <p className="font-medium">{cita.servicio?.nombre || "Servicio"}</p>
+                        <p className="font-medium">
+                          {cita.servicio?.nombre || "Servicio"}
+                        </p>
                         <p className="text-xs text-gray-500">
-                          {cita.servicio?.negocio?.nombre || "Negocio"} • {new Date(cita.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })} a las {cita.hora_inicio}
+                          {cita.servicio?.negocio?.nombre || "Negocio"} •{" "}
+                          {new Date(cita.fecha).toLocaleDateString("es-ES", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}{" "}
+                          a las {cita.hora_inicio}
                         </p>
                       </div>
                       <div className="flex flex-col items-center justify-start gap-2 pt-1">
-                        <span className={`text-xs px-2 py-1 rounded-full ${cita.estado === "pendiente" ? "bg-yellow-100 text-yellow-800" : cita.estado === "completada" || cita.estado === "completado" ? "bg-green-100 text-green-800" : cita.estado === "cancelado" || cita.estado === "cancelada" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}`}>
-                          {cita.estado.charAt(0).toUpperCase() + cita.estado.slice(1)}
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${cita.estado === "pendiente" ? "bg-yellow-100 text-yellow-800" : cita.estado === "completada" || cita.estado === "completado" ? "bg-green-100 text-green-800" : cita.estado === "cancelado" || cita.estado === "cancelada" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}`}
+                        >
+                          {cita.estado.charAt(0).toUpperCase() +
+                            cita.estado.slice(1)}
                         </span>
                         {cita.estado === "pendiente" && (
-                          <button 
-                            onClick={() => setCancelModal({ isOpen: true, citaId: cita.id, isSubmitting: false, error: null })}
+                          <button
+                            onClick={() =>
+                              setCancelModal({
+                                isOpen: true,
+                                citaId: cita.id,
+                                isSubmitting: false,
+                                error: null,
+                              })
+                            }
                             className="text-xs font-medium text-red-500 hover:text-red-700 underline"
                           >
                             Cancelar
@@ -172,7 +215,9 @@ export default function UserData({
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-gray-500">No tienes citas programadas.</p>
+                  <p className="text-sm text-gray-500">
+                    No tienes citas programadas.
+                  </p>
                 )}
               </div>
             </div>
@@ -194,18 +239,28 @@ export default function UserData({
 
             {/* NEGOCIO */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="font-semibold text-lg mb-4">Mi negocio</h2>
-
-              <div className="bg-gray-50 rounded-lg p-4 text-center mb-4">
-                <p className="text-sm text-gray-600">
-                  No tienes un negocio aún
-                </p>
+              <h2 className="font-semibold text-lg mb-4">Mis negocios</h2>
+              <div className="gap-1">
+                {!negocio ? (
+                  <div className="bg-gray-50 rounded-lg p-4 text-center mb-4">
+                    <p className="text-sm text-gray-600">
+                      No tienes un negocio aún
+                    </p>
+                  </div>
+                ) : (
+                  negocio.map((e) => {
+                    return (
+                      <Link href={`/dashboard/${e.id}`} key={e.id}>
+                        <div className="rounded-xl p-4 text-center mb-2 bg-(--primary)/08 border border-(--primary)  hover:bg-(--primary)/10 transition-all duration-200">
+                          <p className="text-sm text-(--primary)">{e.nombre}</p>
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
               </div>
 
-              <Buttons
-                onClick={() => setMostrarModalNegocio(true)}
-                className="w-full"
-              >
+              <Buttons onClick={() => router.push("/business/registration")}>
                 Crear negocio
               </Buttons>
             </div>
@@ -226,9 +281,9 @@ export default function UserData({
                 className="w-full px-4 py-2 border rounded-lg"
               />
 
-              <button className="w-full py-2 bg-black text-white rounded-lg">
+              <Buttons className="w-full py-2 bg-black text-white rounded-lg">
                 Crear
-              </button>
+              </Buttons>
             </form>
           </div>
         </div>
@@ -239,23 +294,38 @@ export default function UserData({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-xl">
             <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
-              <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <svg
+                className="h-8 w-8 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
               </svg>
             </div>
-            
+
             <h3 className="text-xl font-bold text-gray-900 mb-2">
               Cancelar Cita
             </h3>
             <div className="text-sm text-gray-500 mb-6">
-              <p>¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.</p>
+              <p>
+                ¿Estás seguro de que deseas cancelar esta cita? Esta acción no
+                se puede deshacer.
+              </p>
               {cancelModal.error && (
                 <p className="text-red-500 mt-2">{cancelModal.error}</p>
               )}
             </div>
             <div className="flex gap-4">
               <button
-                onClick={() => setCancelModal({ ...cancelModal, isOpen: false })}
+                onClick={() =>
+                  setCancelModal({ ...cancelModal, isOpen: false })
+                }
                 disabled={cancelModal.isSubmitting}
                 className="w-full py-3 rounded-xl font-semibold transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300"
               >

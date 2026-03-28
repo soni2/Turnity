@@ -1,10 +1,12 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import Header from "../../Components/Header";
+import Header from "@/app/Components/Header";
+import { IconMapPin, IconClock, IconPhone } from "@tabler/icons-react";
+import HorariosPreview from "@/app/dashboard/components/SchedulePreview";
 
 export default function CentroPage() {
   const params = useParams();
@@ -64,18 +66,22 @@ export default function CentroPage() {
       // 3. Obtener empleados
       const { data: empleados, error: empleadosError } = await supabase
         .from("empleado")
-        .select(`
+        .select(
+          `
           id,
           biografia,
           foto_url,
           usuario:usuario_id (nombre)
-        `)
+        `,
+        )
         .eq("negocio_id", id)
         .eq("activo", true);
 
       // Derivar texto de horario y horarios disponibles desde negocio.horarios (JSON guardado en BD)
-      const horariosRaw: Record<string, { abierto: boolean; apertura: string; cierre: string }> =
-        negocio.horarios || {};
+      const horariosRaw: Record<
+        string,
+        { abierto: boolean; apertura: string; cierre: string }
+      > = negocio.horarios || {};
 
       const DIAS_MAP: Record<string, string> = {
         lunes: "lun",
@@ -93,18 +99,30 @@ export default function CentroPage() {
         const [hIni, mIni] = apertura.split(":").map(Number);
         const [hFin] = cierre.split(":").map(Number);
         for (let h = hIni; h < hFin; h++) {
-          slots.push(`${String(h).padStart(2, "0")}:${String(mIni).padStart(2, "0")}`);
+          slots.push(
+            `${String(h).padStart(2, "0")}:${String(mIni).padStart(2, "0")}`,
+          );
         }
         return slots;
       }
 
-      const horariosDisponibles: Record<string, string[]> = {};
+      const horariosDisponibles: Record<string, string[]> = {
+        lun: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+        mar: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+        mie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+        jue: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+        vie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+        sab: ["9:00", "10:00", "11:00", "12:00", "13:00"],
+      };
       const diasAbiertos: string[] = [];
 
       Object.entries(horariosRaw).forEach(([dia, config]) => {
         const clave = DIAS_MAP[dia] ?? dia;
         if (config.abierto) {
-          horariosDisponibles[clave] = generarSlots(config.apertura, config.cierre);
+          horariosDisponibles[clave] = generarSlots(
+            config.apertura,
+            config.cierre,
+          );
           diasAbiertos.push(dia.charAt(0).toUpperCase() + dia.slice(1, 3));
         }
       });
@@ -121,22 +139,31 @@ export default function CentroPage() {
 
       const formattedCentro = {
         ...negocio,
-        categoria: negocio.categoria || "Barbería",
-        rating: 5.0,
-        reviews: 128,
-        horario: "Lun - Sáb: 9:00 AM - 8:00 PM",
-        imagenes: [
-          "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=800&auto=format&fit=crop",
-        ],
-        servicios: (servicios || []).map(s => ({ ...s, disponible: true })),
-        profesionales: (empleados as any[] || []).map((e) => ({
+        categoria: negocio.categoria || "Sin categoría",
+        telefono:
+          negocio.telefono_contacto || negocio.telefono || "Sin teléfono",
+        horario: horarioTexto,
+        imagenes: fotosNegocio,
+        servicios: (servicios || []).map((s: any) => ({
+          ...s,
+          disponible: s.activo !== false,
+        })),
+        profesionales: ((empleados as any[]) || []).map((e) => ({
           id: e.id,
           nombre: e.usuario?.nombre || "Profesional",
           especialidad: e.biografia || "Especialista",
           foto_url: e.foto_url || null,
           rating: 5.0,
         })),
-        horariosDisponibles,
+        horariosDisponibles: {
+          lun: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          mar: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          mie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          jue: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          vie: ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+          sab: ["9:00", "10:00", "11:00", "12:00", "13:00"],
+        },
+        horariosRaw,
       };
 
       setCentro(formattedCentro);
@@ -150,32 +177,60 @@ export default function CentroPage() {
     if (!centro) return [];
     const dates = [];
     const today = new Date();
-    const mapDayToKey: Record<number, string> = { 0: "dom", 1: "lun", 2: "mar", 3: "mie", 4: "jue", 5: "vie", 6: "sab" };
+    const mapDayToKey: Record<number, string> = {
+      0: "dom",
+      1: "lun",
+      2: "mar",
+      3: "mie",
+      4: "jue",
+      5: "vie",
+      6: "sab",
+    };
     const mapDayToDisplay = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-    const mapMonthToDisplay = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-    
+    const mapMonthToDisplay = [
+      "Ene",
+      "Feb",
+      "Mar",
+      "Abr",
+      "May",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dic",
+    ];
+
     for (let i = 0; i < 14; i++) {
-        const d = new Date(today);
-        d.setDate(today.getDate() + i);
-        const key = mapDayToKey[d.getDay()];
-        
-        const availableTimes = centro.horariosDisponibles[key as keyof typeof centro.horariosDisponibles];
-        if (availableTimes && availableTimes.length > 0) {
-            dates.push({
-                dateString: d.toISOString().split("T")[0],
-                key,
-                displayDay: mapDayToDisplay[d.getDay()],
-                displayNum: d.getDate(),
-                displayMonth: mapMonthToDisplay[d.getMonth()]
-            });
-        }
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const key = mapDayToKey[d.getDay()];
+
+      const availableTimes =
+        centro.horariosDisponibles[
+          key as keyof typeof centro.horariosDisponibles
+        ];
+      if (availableTimes && availableTimes.length > 0) {
+        dates.push({
+          dateString: d.toISOString().split("T")[0],
+          key,
+          displayDay: mapDayToDisplay[d.getDay()],
+          displayNum: d.getDate(),
+          displayMonth: mapMonthToDisplay[d.getMonth()],
+        });
+      }
     }
     return dates;
   }, [centro]);
 
-  const selectedDateObj = upcomingDates.find((d) => d.dateString === selectedDate);
+  const selectedDateObj = upcomingDates.find(
+    (d) => d.dateString === selectedDate,
+  );
   const availableTimesForSelectedDate = selectedDateObj
-    ? centro.horariosDisponibles[selectedDateObj.key as keyof typeof centro.horariosDisponibles]
+    ? centro.horariosDisponibles[
+        selectedDateObj.key as keyof typeof centro.horariosDisponibles
+      ]
     : [];
 
   const renderStars = (rating: number) => {
@@ -227,16 +282,28 @@ export default function CentroPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      setModalConfig({ isOpen: true, isError: true, title: "Inicia sesión", message: "Debes iniciar sesión para reservar." });
+      setModalConfig({
+        isOpen: true,
+        isError: true,
+        title: "Inicia sesión",
+        message: "Debes iniciar sesión para reservar.",
+      });
       return;
     }
 
     // Obtener info del servicio para la duración
-    const servicio = centro.servicios.find((s: any) => s.id === selectedService);
+    const servicio = centro.servicios.find(
+      (s: any) => s.id === selectedService,
+    );
     const profesional = centro.profesionales[0]; // Tomar el primero por ahora
 
     if (!profesional) {
-      setModalConfig({ isOpen: true, isError: true, title: "Sin profesionales", message: "No hay profesionales disponibles para este negocio." });
+      setModalConfig({
+        isOpen: true,
+        isError: true,
+        title: "Sin profesionales",
+        message: "No hay profesionales disponibles para este negocio.",
+      });
       return;
     }
 
@@ -251,9 +318,19 @@ export default function CentroPage() {
 
     if (error) {
       console.error("Error al reservar:", error);
-      setModalConfig({ isOpen: true, isError: true, title: "Error en la reserva", message: "Hubo un error al procesar tu reserva. Inténtalo de nuevo." });
+      setModalConfig({
+        isOpen: true,
+        isError: true,
+        title: "Error en la reserva",
+        message: "Hubo un error al procesar tu reserva. Inténtalo de nuevo.",
+      });
     } else {
-      setModalConfig({ isOpen: true, isError: false, title: "¡Reserva confirmada!", message: "Tu cita ha sido agendada con éxito." });
+      setModalConfig({
+        isOpen: true,
+        isError: false,
+        title: "¡Reserva confirmada!",
+        message: "Tu cita ha sido agendada con éxito.",
+      });
       setSelectedService(null);
       setSelectedTime("");
     }
@@ -262,46 +339,17 @@ export default function CentroPage() {
   return (
     <div className="min-h-screen bg-gray-50 pt-[64px]">
       <Header variant="app" />
-      {/* Header con navegación */}
-      <div className="bg-white border-b sticky top-[64px] z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/explore"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                {/* <ChevronLeftIcon className="h-5 w-5" /> */}
-              </Link>
-              <h1 className="text-xl font-semibold">{centro.nombre}</h1>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                {/* <ShareIcon className="h-5 w-5" /> */}
-              </button>
-              <button
-                onClick={() => setFavorito(!favorito)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                {/* {favorito ? (
-                  <HeartSolidIcon className="h-5 w-5 text-red-500" />
-                ) : (
-                  <HeartIcon className="h-5 w-5" />
-                )} */}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Contenido principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-24">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna izquierda - Información del centro */}
           <div className="lg:col-span-2">
             {/* Fotos del negocio */}
             {centro.imagenes && centro.imagenes.length > 0 ? (
-              <div className={`grid gap-4 mb-6 ${centro.imagenes.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              <div
+                className={`grid gap-4 mb-6 ${centro.imagenes.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}
+              >
                 {centro.imagenes.map((img: string, idx: number) => (
                   <div
                     key={idx}
@@ -340,17 +388,17 @@ export default function CentroPage() {
 
               <p className="text-gray-600 mb-4">{centro.descripcion}</p>
 
-              <div className="space-y-2 text-sm">
+              <div className="space-y-3 text-sm">
                 <div className="flex items-center text-gray-600">
-                  {/* <MapPinIcon className="h-5 w-5 mr-2 flex-shrink-0" /> */}
-                  <span>{centro.direccion}</span>
+                  <IconMapPin className="h-5 w-5 mr-3 flex-shrink-0 text-[var(--primary)]" />
+                  <span>{centro.direccion || "Dirección no especificada"}</span>
                 </div>
                 <div className="flex items-center text-gray-600">
-                  {/* <ClockIcon className="h-5 w-5 mr-2 flex-shrink-0" /> */}
+                  <IconClock className="h-5 w-5 mr-3 flex-shrink-0 text-[var(--primary)]" />
                   <span>{centro.horario}</span>
                 </div>
                 <div className="flex items-center text-gray-600">
-                  {/* <PhoneIcon className="h-5 w-5 mr-2 flex-shrink-0" /> */}
+                  <IconPhone className="h-5 w-5 mr-3 flex-shrink-0 text-[var(--primary)]" />
                   <span>{centro.telefono}</span>
                 </div>
               </div>
@@ -403,6 +451,11 @@ export default function CentroPage() {
               </div>
             </div>
 
+            {/* Horarios Detallados */}
+            <div className="mb-6">
+              <HorariosPreview horarios={centro.horariosRaw} />
+            </div>
+
             {/* Profesionales */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="font-semibold text-lg mb-4">
@@ -431,7 +484,9 @@ export default function CentroPage() {
                     </div>
                     <div>
                       <h4 className="font-medium">{pro.nombre}</h4>
-                      <p className="text-xs text-gray-500">{pro.especialidad}</p>
+                      <p className="text-xs text-gray-500">
+                        {pro.especialidad}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -442,123 +497,132 @@ export default function CentroPage() {
           {/* Columna derecha - Reserva sticky */}
 
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
-              <h3 className="font-semibold text-lg mb-4">Reservar cita</h3>
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
+                <h3 className="font-semibold text-lg mb-4">Reservar cita</h3>
 
-              {/* Selector de servicio */}
-              {selectedService && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Servicio seleccionado</p>
-                  <p className="font-medium">
-                    {
-                      centro.servicios.find((s: any) => s.id === selectedService)
-                        ?.nombre
-                    }
-                  </p>
-                </div>
-              )}
-
-              {/* Selector de día */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Selecciona un día
-                </label>
-                <div className="flex space-x-2 overflow-x-auto pb-2">
-                  {upcomingDates.map((dia) => (
-                    <button
-                      key={dia.dateString}
-                      onClick={() => {
-                        setSelectedDate(dia.dateString);
-                        setSelectedTime(""); // Resetear hora al cambiar día
-                      }}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium flex flex-col items-center justify-center min-w-[70px] whitespace-nowrap transition-colors ${
-                        selectedDate === dia.dateString
-                          ? "bg-[var(--primary)] text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      <span className="text-xs uppercase mb-1">{dia.displayDay}</span>
-                      <span className="text-lg font-bold">{dia.displayNum}</span>
-                      <span className="text-xs">{dia.displayMonth}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Horarios disponibles */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Selecciona un horario
-                </label>
-
-                {isMobile ? (
-                  // Selector tipo rueda para móvil
-                  <select
-                    value={selectedTime}
-                    onChange={(e) => setSelectedTime(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent appearance-none"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
-                      backgroundPosition: "right 0.75rem center",
-                      backgroundRepeat: "no-repeat",
-                      backgroundSize: "1.5em 1.5em",
-                      paddingRight: "2.5rem",
-                    }}
-                  >
-                    <option value="">Selecciona una hora</option>
-                    {availableTimesForSelectedDate?.map((hora: any) => (
-                      <option key={hora} value={hora}>
-                        {hora}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  // Botones de selección única para desktop
-                  <div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {availableTimesForSelectedDate?.map((hora: any) => (
-                        <button
-                          key={hora}
-                          onClick={() => setSelectedTime(hora)}
-                          className={`px-3 py-2 text-sm border rounded-lg transition-colors ${
-                            selectedTime === hora
-                              ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                              : "hover:border-[var(--primary)] text-gray-700"
-                          }`}
-                        >
-                          {hora}
-                        </button>
-                      ))}
-                    </div>
-                    {selectedTime && (
-                      <p className="text-sm text-green-600 mt-2">
-                        ✓ Horario seleccionado: {selectedTime}
-                      </p>
-                    )}
+                {/* Selector de servicio */}
+                {selectedService && (
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500">
+                      Servicio seleccionado
+                    </p>
+                    <p className="font-medium">
+                      {
+                        centro.servicios.find(
+                          (s: any) => s.id === selectedService,
+                        )?.nombre
+                      }
+                    </p>
                   </div>
                 )}
-              </div>
 
-              {/* Botón de reserva */}
-              <button
-                onClick={handleReserva}
-                disabled={!selectedService || !selectedTime}
-                className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                  selectedService && selectedTime
-                    ? "bg-[var(--primary)] text-white hover:opacity-90 cursor-pointer"
-                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                {!selectedService
-                  ? "Selecciona un servicio"
-                  : !selectedTime
-                    ? "Selecciona un horario"
-                    : "Confirmar reserva"}
-              </button>
+                {/* Selector de día */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Selecciona un día
+                  </label>
+                  <div className="flex space-x-2 overflow-x-auto pb-2">
+                    {upcomingDates.map((dia) => (
+                      <button
+                        key={dia.dateString}
+                        onClick={() => {
+                          setSelectedDate(dia.dateString);
+                          setSelectedTime(""); // Resetear hora al cambiar día
+                        }}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium flex flex-col items-center justify-center min-w-[70px] whitespace-nowrap transition-colors ${
+                          selectedDate === dia.dateString
+                            ? "bg-[var(--primary)] text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        <span className="text-xs uppercase mb-1">
+                          {dia.displayDay}
+                        </span>
+                        <span className="text-lg font-bold">
+                          {dia.displayNum}
+                        </span>
+                        <span className="text-xs">{dia.displayMonth}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Información adicional */}
-              <div className="mt-4 text-xs text-gray-500 text-center">
-                <p>Cancelación gratis hasta 2 horas antes</p>
+                {/* Horarios disponibles */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Selecciona un horario
+                  </label>
+
+                  {isMobile ? (
+                    // Selector tipo rueda para móvil
+                    <select
+                      value={selectedTime}
+                      onChange={(e) => setSelectedTime(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                        backgroundPosition: "right 0.75rem center",
+                        backgroundRepeat: "no-repeat",
+                        backgroundSize: "1.5em 1.5em",
+                        paddingRight: "2.5rem",
+                      }}
+                    >
+                      <option value="">Selecciona una hora</option>
+                      {availableTimesForSelectedDate?.map((hora: any) => (
+                        <option key={hora} value={hora}>
+                          {hora}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    // Botones de selección única para desktop
+                    <div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {availableTimesForSelectedDate?.map((hora: any) => (
+                          <button
+                            key={hora}
+                            onClick={() => setSelectedTime(hora)}
+                            className={`px-3 py-2 text-sm border rounded-lg transition-colors ${
+                              selectedTime === hora
+                                ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                : "hover:border-[var(--primary)] text-gray-700"
+                            }`}
+                          >
+                            {hora}
+                          </button>
+                        ))}
+                      </div>
+                      {selectedTime && (
+                        <p className="text-sm text-green-600 mt-2">
+                          ✓ Horario seleccionado: {selectedTime}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Botón de reserva */}
+                <button
+                  onClick={handleReserva}
+                  disabled={!selectedService || !selectedTime}
+                  className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                    selectedService && selectedTime
+                      ? "bg-[var(--primary)] text-white hover:opacity-90 cursor-pointer"
+                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  {!selectedService
+                    ? "Selecciona un servicio"
+                    : !selectedTime
+                      ? "Selecciona un horario"
+                      : "Confirmar reserva"}
+                </button>
+
+                {/* Información adicional */}
+                <div className="mt-4 text-xs text-gray-500 text-center">
+                  <p>Cancelación gratis hasta 2 horas antes</p>
+                </div>
               </div>
             </div>
           </div>
@@ -571,14 +635,34 @@ export default function CentroPage() {
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-xl">
             {modalConfig.isError ? (
               <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
-                <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="h-8 w-8 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </div>
             ) : (
               <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
-                <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                <svg
+                  className="h-8 w-8 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
               </div>
             )}
@@ -591,7 +675,9 @@ export default function CentroPage() {
             <button
               onClick={() => setModalConfig({ ...modalConfig, isOpen: false })}
               className={`w-full py-3 rounded-xl font-semibold transition-colors text-white ${
-                modalConfig.isError ? "bg-red-600 hover:bg-red-700" : "bg-[var(--primary)] hover:opacity-90"
+                modalConfig.isError
+                  ? "bg-red-600 hover:bg-red-700"
+                  : "bg-[var(--primary)] hover:opacity-90"
               }`}
             >
               Aceptar

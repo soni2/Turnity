@@ -1,36 +1,29 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import DashboardLayout from "./DashboardLayout";
 
-import Sidebar from "./components/Sidebar";
-import Topbar from "./components/Toolbar";
-import StatsCard from "./components/StatsCard";
-import ServiciosList from "./components/ServicesList";
-import HorariosPreview from "./components/SchedulePreview";
-import Header from "../Components/Header";
+export default async function GeneralDashboardPage() {
+  const supabase = await createClient();
 
-export default function DashboardPage() {
-  return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  // if (!user) {
+  //   router.push("/login");
+  //   return
+  // }
 
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <Topbar />
+  if (!user) {
+    return <div>No autorizado</div>;
+  } else {
+  }
 
-        <main className="p-6 space-y-6">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatsCard title="Citas hoy" value="12" />
-            <StatsCard title="Ingresos" value="RD$ 8,500" />
-            <StatsCard title="Clientes nuevos" value="5" />
-          </div>
+  const { data: business, error } = await supabase
+    .from("negocio")
+    .select("*")
+    .eq("dueno_id", user.id);
 
-          {/* Contenido principal */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ServiciosList />
-            <HorariosPreview />
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+  if (error) {
+    return <div>Error: {error.message}</div>;
+  }
+  return <DashboardLayout negocio={business} />;
 }

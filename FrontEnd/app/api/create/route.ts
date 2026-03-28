@@ -15,14 +15,6 @@ export async function POST(req: Request) {
       coordenadas,
       fotos,
     } = body;
-    // console.log("Datos recibidos en API:", body);
-
-    // return NextResponse.json(
-    //   { message: "Datos recibidos correctamente" },
-    //   { status: 200 },
-    // );
-
-    // console.log("Datos recibidos en API:", body);
 
     const {
       data: { user },
