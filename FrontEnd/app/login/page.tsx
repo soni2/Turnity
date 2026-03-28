@@ -83,7 +83,7 @@ export default function Page() {
           {/* Sign up link */}
           <p className="text-center text-gray-600">
             ¿No tienes una cuenta?{" "}
-            <a href="#" className="text-black font-medium hover:underline">
+            <a href="/register" className="text-black font-medium hover:underline">
               Regístrate ahora
             </a>
           </p>

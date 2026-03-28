@@ -29,7 +29,7 @@ export default function Page() {
             <Input label="Repetir Contraseña" type="password" placeholder=" " />
 
             {/* Submit button */}
-            <Buttons className="w-full">Iniciar Sesión</Buttons>
+            <Buttons className="w-full">Registrarse</Buttons>
           </form>
 
           {/* Divider */}
@@ -50,9 +50,9 @@ export default function Page() {
 
           {/* Sign up link */}
           <p className="text-center text-gray-600">
-            ¿No tienes una cuenta?{" "}
-            <a href="#" className="text-black font-medium hover:underline">
-              Regístrate ahora
+            ¿Ya tienes una cuenta?{" "}
+            <a href="/login" className="text-black font-medium hover:underline">
+              Inicia sesión ahora
             </a>
           </p>
         </div>

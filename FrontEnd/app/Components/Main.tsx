@@ -44,7 +44,7 @@ export default function Main({
           placeholder="Buscar servicios, estilistas..."
           className="w-full pl-10 pr-20 sm:pr-24 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white placeholder:text-gray-500 text-black"
         />
-        <button className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black text-white px-3 sm:px-5 py-1.5 rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
+        <button className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[var(--primary)] text-white px-3 sm:px-5 py-1.5 rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
           Buscar
         </button>
         <SearchIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -89,7 +89,7 @@ export default function Main({
 
             <button
               onClick={() => handleRouter(`/business/${servicio.id}`)}
-              className="w-full mt-auto bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+              className="w-full mt-auto bg-[var(--primary)] text-white py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
               Reservar
             </button>

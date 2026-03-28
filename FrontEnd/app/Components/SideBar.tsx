@@ -47,14 +47,15 @@ export default function SideBar({
             <input
               type="range"
               min="0"
-              max="100"
+              max="10000"
+              step="50"
               value={rangoPrecio[1]}
               onChange={(e) => setRangoPrecio([0, parseInt(e.target.value)])}
               className="w-full"
             />
             <div className="flex justify-between text-sm text-gray-600">
-              <span>$0</span>
-              <span>${rangoPrecio[1]}+</span>
+              <span>RD$0</span>
+              <span>RD${rangoPrecio[1]}+</span>
             </div>
           </div>
         </div>
