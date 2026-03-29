@@ -27,8 +27,8 @@ export default function Main({
   servicios,
   setOrdenarPor,
   renderStars,
-  busqueda,
-  setBusqueda,
+  // busqueda,
+  // setBusqueda,
 }: Props) {
   const { handleRouter } = useFunctions();
 
@@ -36,7 +36,7 @@ export default function Main({
     <main className="flex-1">
 
       {/* Buscador */}
-      <div className="relative mb-6">
+      {/* <div className="relative mb-6">
         <input
           type="text"
           value={busqueda}
@@ -48,7 +48,7 @@ export default function Main({
           Buscar
         </button>
         <SearchIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-      </div>
+      </div> */}
 
       {/* Ordenar por */}
       <div className="flex justify-between items-center mb-6">

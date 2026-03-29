@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
 import SideBar from "../Components/SideBar";
 import Main from "../Components/Main";
 import Header from "../Components/Header";
@@ -9,8 +11,10 @@ import Link from "next/link";
 import MobileNav from "../Components/MobileNav";
 
 export default function Home() {
-  const [busqueda, setBusqueda] = useState("");
+  const searchParams = useSearchParams();
+  const [busqueda, setBusqueda] = useState(searchParams.get("q") ?? "");
   const [categoriaActiva, setCategoriaActiva] = useState("Todas");
+
   const [rangoPrecio, setRangoPrecio] = useState([0, 5000]);
   const [ordenarPor, setOrdenarPor] = useState("recomendados");
   const [showFilters, setShowFilters] = useState(false);
@@ -18,6 +22,12 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   const categorias = ["Todas", "Barbería", "Salón", "Uñas"];
+
+  // Sync search input with URL param when header updates it
+  useEffect(() => {
+    const q = searchParams.get("q") ?? "";
+    setBusqueda(q);
+  }, [searchParams]);
 
   useEffect(() => {
     async function fetchNegocios() {
@@ -97,7 +107,7 @@ export default function Home() {
       <Header variant="app" />
 
       {/* Contenido principal con sidebar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20 lg:pb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
         
         {/* Botón Filtros (Móvil) */}
         <div className="lg:hidden mb-4">

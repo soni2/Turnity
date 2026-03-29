@@ -166,10 +166,10 @@ export default function Home() {
         gridMd="md:grid-cols-2"
       >
         <Buttons
-          onClick={() => handleRouter("/login")}
+          onClick={() => handleRouter("/explore")}
           className="w-full bg-black border-2 border-black"
         >
-          Iniciar ahora
+          Explorar negocios
         </Buttons>
         <Buttons
           onClick={() => handleRouter("/register")}

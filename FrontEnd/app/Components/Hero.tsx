@@ -29,8 +29,8 @@ export default function Hero() {
               crecer tu negocio.
             </p>
 
-            <Buttons onClick={() => handleRouter("/login")}>
-              Iniciar ahora
+            <Buttons onClick={() => handleRouter("/explore")}>
+              Explorar negocios
             </Buttons>
           </div>
         </div>

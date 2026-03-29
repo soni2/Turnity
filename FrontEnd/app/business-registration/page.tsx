@@ -17,7 +17,7 @@ export default function Page() {
           {/* Logo */}
           <div className="text-center mb-8 flex flex-col items-center gap-2">
             <h2 className="mt-4 text-2xl font-semibold text-gray-900">
-              Registrar
+              Registrate
             </h2>
           </div>
 

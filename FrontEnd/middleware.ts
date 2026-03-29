@@ -40,6 +40,8 @@ export async function middleware(request: NextRequest) {
     url.pathname === '/' ||
     url.pathname.startsWith('/login') ||
     url.pathname.startsWith('/register') ||
+    url.pathname.startsWith('/explore') ||
+    url.pathname.startsWith('/business') ||
     url.pathname.startsWith('/api') ||
     url.pathname.startsWith('/_next') ||
     url.pathname.includes('.'); // Allow public files (images, favicon, etc.)

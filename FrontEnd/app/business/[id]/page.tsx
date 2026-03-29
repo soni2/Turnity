@@ -2,14 +2,17 @@
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/app/Components/Header";
 import { IconMapPin, IconClock, IconPhone } from "@tabler/icons-react";
 import HorariosPreview from "@/app/dashboard/components/SchedulePreview";
+import PaymentModal from "@/app/Components/PaymentModal";
 
 export default function CentroPage() {
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const id = params.id as string;
 
   const [centro, setCentro] = useState<any>(null);
@@ -25,6 +28,7 @@ export default function CentroPage() {
     title: "",
     message: "",
   });
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   // Detectar si es móvil
   useEffect(() => {
@@ -273,6 +277,7 @@ export default function CentroPage() {
     );
   }
 
+  // Step 1: validate then open payment modal
   const handleReserva = async () => {
     if (!selectedService || !selectedTime || !centro || !selectedDate) return;
 
@@ -282,21 +287,11 @@ export default function CentroPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      setModalConfig({
-        isOpen: true,
-        isError: true,
-        title: "Inicia sesión",
-        message: "Debes iniciar sesión para reservar.",
-      });
+      router.push(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
 
-    // Obtener info del servicio para la duración
-    const servicio = centro.servicios.find(
-      (s: any) => s.id === selectedService,
-    );
-    const profesional = centro.profesionales[0]; // Tomar el primero por ahora
-
+    const profesional = centro.profesionales[0];
     if (!profesional) {
       setModalConfig({
         isOpen: true,
@@ -306,6 +301,21 @@ export default function CentroPage() {
       });
       return;
     }
+
+    // Open payment modal instead of inserting directly
+    setPaymentModalOpen(true);
+  };
+
+  // Step 2: called by PaymentModal after successful payment simulation
+  const handleConfirmedPayment = async () => {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user || !selectedService || !selectedTime || !selectedDate) return;
+
+    const profesional = centro.profesionales[0];
 
     const { error } = await supabase.from("turno").insert({
       cliente_id: user.id,
@@ -322,17 +332,18 @@ export default function CentroPage() {
         isOpen: true,
         isError: true,
         title: "Error en la reserva",
-        message: "Hubo un error al procesar tu reserva. Inténtalo de nuevo.",
+        message: "Pago procesado, pero hubo un error al guardar la cita. Contacta soporte.",
       });
     } else {
       setModalConfig({
         isOpen: true,
         isError: false,
         title: "¡Reserva confirmada!",
-        message: "Tu cita ha sido agendada con éxito.",
+        message: "Tu pago fue procesado y tu cita ha sido agendada con éxito.",
       });
       setSelectedService(null);
       setSelectedTime("");
+      setSelectedDate(null);
     }
   };
 
@@ -620,14 +631,34 @@ export default function CentroPage() {
                 </button>
 
                 {/* Información adicional */}
-                <div className="mt-4 text-xs text-gray-500 text-center">
-                  <p>Cancelación gratis hasta 2 horas antes</p>
+                <div className="mt-4 text-xs text-gray-500 text-center space-y-0.5">
+                  <p> 100% reembolso si cancelas 24h antes</p>
+                  <p> 50% reembolso si cancelas 2h antes</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {(() => {
+        const servicioSeleccionado = centro?.servicios?.find(
+          (s: any) => s.id === selectedService
+        );
+        return (
+          <PaymentModal
+            isOpen={paymentModalOpen}
+            onClose={() => setPaymentModalOpen(false)}
+            onPaymentSuccess={handleConfirmedPayment}
+            negocio={centro?.nombre ?? ""}
+            servicio={servicioSeleccionado?.nombre ?? ""}
+            precio={servicioSeleccionado?.precio ?? 0}
+            fecha={selectedDate ?? ""}
+            hora={selectedTime}
+          />
+        );
+      })()}
 
       {/* Modal de confirmación */}
       {modalConfig.isOpen && (

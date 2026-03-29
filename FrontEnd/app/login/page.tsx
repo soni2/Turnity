@@ -11,7 +11,9 @@ function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
 }
 
 function handleSubmitWithGoogle() {
-  auth.loginWithGoogle();
+  const params = new URLSearchParams(window.location.search);
+  const next = params.get("next") || undefined;
+  auth.loginWithGoogle(next);
 }
 
 export default function Page() {
