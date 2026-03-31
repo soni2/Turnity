@@ -5,7 +5,6 @@ import Header from "../Components/Header";
 import MobileNav from "../Components/MobileNav";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { IconEditFilled } from "@tabler/icons-react";
 import Link from "next/link";
 
 interface Negocio {
@@ -106,21 +105,9 @@ export default function UserData({
     <div className="min-h-screen bg-gray-50">
       {/* HEADER */}
       <Header variant="app" />
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <button className="text-gray-600 hover:text-black">← Volver</button>
-
-          <button
-            onClick={() => setModoEdicion(!modoEdicion)}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-          >
-            Editar perfil
-          </button>
-        </div>
-      </div>
 
       {/* CONTENIDO */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* IZQUIERDA */}
           <div className="lg:col-span-2 space-y-6">
@@ -239,24 +226,50 @@ export default function UserData({
 
             {/* NEGOCIO */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="font-semibold text-lg mb-4">Mis negocios</h2>
-              <div className="gap-1">
-                {!negocio ? (
-                  <div className="bg-gray-50 rounded-lg p-4 text-center mb-4">
-                    <p className="text-sm text-gray-600">
-                      No tienes un negocio aún
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-lg">Mis negocios</h2>
+                {negocio && negocio.length > 0 && (
+                  <span className="text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                    {negocio.length}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2 mb-4 flex flex-col gap-2">
+                {!negocio || negocio.length === 0 ? (
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <p className="text-sm text-gray-500">
+                      No tienes negocios aún
                     </p>
                   </div>
                 ) : (
-                  negocio.map((e) => {
-                    return (
-                      <Link href={`/dashboard/${e.id}`} key={e.id}>
-                        <div className="rounded-xl p-4 text-center mb-2 bg-(--primary)/08 border border-(--primary)  hover:bg-(--primary)/10 transition-all duration-200">
-                          <p className="text-sm text-(--primary)">{e.nombre}</p>
+                  <>
+                    {/* Mostrar máximo 3 */}
+                    {negocio.slice(0, 3).map((e) => (
+                      <Link
+                        href={`/dashboard/${e.id}`}
+                        key={e.id}
+                        className="cursor-pointer"
+                      >
+                        <div className="rounded-xl p-4 text-center bg-(--primary)/08 border border-(--primary) hover:bg-(--primary)/10 transition-all duration-200">
+                          <p className="text-sm text-(--primary) font-medium">
+                            {e.nombre}
+                          </p>
                         </div>
                       </Link>
-                    );
-                  })
+                    ))}
+
+                    {/* Botón "Gestionar" si hay más de 3 */}
+                    {negocio.length > 3 && (
+                      <Link href="/dashboard">
+                        <div className="rounded-xl px-4 py-3 text-center border border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-200">
+                          <p className="text-sm text-gray-500 font-medium">
+                            +{negocio.length - 3} más — Gestionar mis negocios →
+                          </p>
+                        </div>
+                      </Link>
+                    )}
+                  </>
                 )}
               </div>
 

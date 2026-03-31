@@ -1,6 +1,5 @@
 "use client";
 
-import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
 import { FormData } from "../types/registroNegocio";
 
 export default function Paso1InfoBasica({
@@ -13,7 +12,7 @@ export default function Paso1InfoBasica({
   categorias: string[];
   formData: FormData;
   handleChange: (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => void;
   buttonDisabled: boolean;
   setButtonDisabled: React.Dispatch<React.SetStateAction<boolean>>;
@@ -25,6 +24,7 @@ export default function Paso1InfoBasica({
         <p className="text-gray-600">Cuéntanos sobre tu negocio</p>
       </div>
 
+      {/* Nombre */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Nombre del negocio *
@@ -40,6 +40,7 @@ export default function Paso1InfoBasica({
         />
       </div>
 
+      {/* Categoría */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Categoría *
@@ -60,6 +61,27 @@ export default function Paso1InfoBasica({
         </select>
       </div>
 
+      {/* Descripción */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Descripción del negocio{" "}
+          <span className="text-gray-400 font-normal">(opcional)</span>
+        </label>
+        <textarea
+          name="descripcion"
+          value={formData.descripcion ?? ""}
+          onChange={handleChange}
+          rows={3}
+          maxLength={500}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black resize-none"
+          placeholder="Cuéntale a tus clientes qué hace especial a tu negocio, tu especialidad, años de experiencia..."
+        />
+        <p className="text-xs text-gray-400 mt-1 text-right">
+          {(formData.descripcion ?? "").length}/500
+        </p>
+      </div>
+
+      {/* Email y Teléfono */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -92,9 +114,10 @@ export default function Paso1InfoBasica({
         </div>
       </div>
 
+      {/* Sitio web */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Sitio web (opcional)
+          Sitio web <span className="text-gray-400 font-normal">(opcional)</span>
         </label>
         <input
           type="url"

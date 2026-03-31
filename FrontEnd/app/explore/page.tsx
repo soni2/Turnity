@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 import SideBar from "../Components/SideBar";
@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import MobileNav from "../Components/MobileNav";
 
-export default function Home() {
+function ExploreContent() {
   const searchParams = useSearchParams();
   const [busqueda, setBusqueda] = useState(searchParams.get("q") ?? "");
   const [categoriaActiva, setCategoriaActiva] = useState("Todas");
@@ -21,7 +21,16 @@ export default function Home() {
   const [servicios, setServicios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const categorias = ["Todas", "Barbería", "Salón", "Uñas"];
+  const categorias = [
+    "Barbería",
+    "Salón de belleza",
+    "Centro de uñas",
+    "Spa",
+    "Centro de estética",
+    "Peluquería infantil",
+    "Centro de depilación",
+    "Otro",
+  ];
 
   // Sync search input with URL param when header updates it
   useEffect(() => {
@@ -32,14 +41,14 @@ export default function Home() {
   useEffect(() => {
     async function fetchNegocios() {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("negocio")
-        .select(`
+      const { data, error } = await supabase.from("negocio").select(`
           id,
           nombre,
           descripcion,
           ciudad,
-          categoria
+          categoria,
+          logo_url,
+          fotos
         `);
 
       if (error) {
@@ -53,6 +62,8 @@ export default function Home() {
           rating: 5, // Placeholder ya que no hay rating en la tabla todavía
           precio: 0, // Placeholder
           categoria: n.categoria || "Barbería", // Usar la categoría real o un default
+          logo_url: n.logo_url || "/no-picture.webp",
+          fotos: n.fotos || ["/no-picture.webp"],
         }));
         setServicios(formattedData);
       }
@@ -85,7 +96,7 @@ export default function Home() {
     );
   }
 
-  const serviciosFiltrados = servicios.filter(servicio => {
+  const serviciosFiltrados = servicios.filter((servicio) => {
     // Filtro de categoría
     if (categoriaActiva !== "Todas" && servicio.categoria !== categoriaActiva) {
       return false;
@@ -95,7 +106,10 @@ export default function Home() {
       return false;
     }
     // Filtro de búsqueda
-    if (busqueda && !servicio.title.toLowerCase().includes(busqueda.toLowerCase())) {
+    if (
+      busqueda &&
+      !servicio.title.toLowerCase().includes(busqueda.toLowerCase())
+    ) {
       return false;
     }
     return true;
@@ -108,15 +122,23 @@ export default function Home() {
 
       {/* Contenido principal con sidebar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
-        
         {/* Botón Filtros (Móvil) */}
         <div className="lg:hidden mb-4">
-          <button 
+          <button
             onClick={() => setShowFilters(!showFilters)}
             className="w-full bg-white border border-gray-300 shadow-sm text-black py-2.5 rounded-lg text-sm font-medium flex justify-center items-center gap-2"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
             </svg>
             {showFilters ? "Ocultar Filtros" : "Mostrar Filtros"}
           </button>
@@ -147,5 +169,13 @@ export default function Home() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-xl font-semibold">Cargando...</p></div>}>
+      <ExploreContent />
+    </Suspense>
   );
 }

@@ -1,96 +1,141 @@
 "use client";
+import React, { Suspense } from "react";
 import Logo from "../Components/Logo";
 import Input from "../Components/Input";
 import { auth } from "@/lib/auth";
 import { GoogleIcon } from "../Components/Icons";
-import { Buttons } from "../Components/Buttons";
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
-function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-  event.preventDefault();
-  // Aquí puedes agregar la lógica para manejar el inicio de sesión
-}
+function LoginContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/explore";
 
-function handleSubmitWithGoogle() {
-  const params = new URLSearchParams(window.location.search);
-  const next = params.get("next") || undefined;
-  auth.loginWithGoogle(next);
-}
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-export default function Page() {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      await auth.loginWithEmail(email, password);
+      router.push(next);
+      router.refresh();
+    } catch (err: any) {
+      setError(
+        err.message === "Invalid login credentials"
+          ? "Correo o contraseña incorrectos."
+          : err.message,
+      );
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = () => {
+    const nextParam = searchParams.get("next") || undefined;
+    auth.loginWithGoogle(nextParam);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 ">
-      <div className="flex rounded-2xl overflow-hidden max-w-4xl w-full">
-        <div className="w-1/3 bg-[var(--primary)] flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="flex rounded-2xl overflow-hidden max-w-4xl w-full shadow-xl">
+        {/* Panel izquierdo */}
+        <div className="w-1/3 bg-[var(--primary)] hidden sm:flex items-center justify-center">
           <Logo className="h-10 fill-white" />
         </div>
 
         {/* Formulario */}
-        <div className="w-2/3 bg-white shadow-xl p-8">
-          {/* Logo */}
-          <div className="text-center mb-8 flex flex-col items-center gap-4">
-            <h2 className="mt-4 text-2xl font-semibold text-gray-900">
-              Inicia Sesión
-            </h2>
+        <div className="flex-1 bg-white p-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-semibold text-gray-900">Inicia sesión</h2>
+            <p className="text-sm text-gray-500 mt-1">Bienvenido de vuelta</p>
           </div>
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Email */}
-            <Input label="Correo electrónico" type="email" placeholder=" " />
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <Input
+              label="Correo electrónico"
+              type="email"
+              placeholder=" "
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <Input
+              label="Contraseña"
+              type="password"
+              placeholder=" "
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
 
-            {/* Password */}
-            <Input label="Contraseña" type="password" placeholder=" " />
-
-            {/* Remember me & Forgot password */}
             <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 text-black focus:ring-black mr-2"
-                />
-                <span className="te xt-gray-700">Recordarme</span>
+              <label className="flex items-center gap-2 text-gray-600">
+                <input type="checkbox" className="rounded border-gray-300" />
+                Recordarme
               </label>
-              <a href="#" className="text-black hover:underline font-medium">
+              <a href="#" className="text-[var(--primary)] hover:underline font-medium">
                 ¿Olvidaste tu contraseña?
               </a>
             </div>
 
-            {/* Submit button */}
+            {/* Error */}
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-center">
+                {error}
+              </p>
+            )}
+
             <button
               type="submit"
-              className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+              disabled={loading}
+              className="w-full bg-[var(--primary)] text-white py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              Iniciar Sesión
+              {loading ? "Iniciando sesión..." : "Iniciar sesión"}
             </button>
           </form>
 
           {/* Divider */}
-          <div className="relative my-6">
+          <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-gray-200" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">O</span>
+              <span className="px-3 bg-white text-gray-400">O continúa con</span>
             </div>
           </div>
 
-          {/* Google button */}
+          {/* Google */}
           <button
-            onClick={handleSubmitWithGoogle}
-            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors mb-6"
+            onClick={handleGoogle}
+            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors mb-5"
           >
             <GoogleIcon />
-            Inicia sesión con Google
+            Iniciar sesión con Google
           </button>
 
-          {/* Sign up link */}
-          <p className="text-center text-gray-600">
-            ¿No tienes una cuenta?{" "}
-            <a href="/register" className="text-black font-medium hover:underline">
-              Regístrate ahora
-            </a>
+          <p className="text-center text-sm text-gray-500">
+            ¿No tienes cuenta?{" "}
+            <Link href="/register" className="text-[var(--primary)] font-semibold hover:underline">
+              Regístrate gratis
+            </Link>
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><p>Cargando...</p></div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

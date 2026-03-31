@@ -65,7 +65,7 @@ export default function CentroPage() {
         .from("servicio")
         .select("*")
         .eq("negocio_id", id)
-        .eq("activo", true);
+        .neq("activo", false); // incluye activo=TRUE y activo=NULL
 
       // 3. Obtener empleados
       const { data: empleados, error: empleadosError } = await supabase
@@ -352,7 +352,7 @@ export default function CentroPage() {
       <Header variant="app" />
 
       {/* Contenido principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna izquierda - Información del centro */}
           <div className="lg:col-span-2">

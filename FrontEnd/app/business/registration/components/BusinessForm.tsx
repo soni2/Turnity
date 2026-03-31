@@ -2,6 +2,7 @@
 import { Buttons } from "@/app/Components/Buttons";
 import useRegistrationBusiness from "../Hooks/useRegistrationBusiness";
 import ProgressBar from "./ProgressBar";
+import NegocioCreado from "./NegocioCreado";
 
 export default function BusinessForm() {
   const {
@@ -11,7 +12,19 @@ export default function BusinessForm() {
     renderPaso,
     handleCreate,
     isPasoValido,
+    negocioCreado,
   } = useRegistrationBusiness();
+
+  // ── Mostrar pantalla de éxito tras crear el negocio ──────────
+  if (negocioCreado) {
+    return (
+      <NegocioCreado
+        negocioId={negocioCreado.id}
+        negocioNombre={negocioCreado.nombre}
+      />
+    );
+  }
+
 
   const pasoValido = isPasoValido(paso);
 

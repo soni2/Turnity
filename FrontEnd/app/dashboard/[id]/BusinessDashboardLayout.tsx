@@ -24,7 +24,7 @@ type NegocioDetalle = {
 
 export default function BusinessDashboardLayout({
   data,
-}: React.PropsWithChildren<{ data: [NegocioDetalle]; id: string }>) {
+}: React.PropsWithChildren<{ data: NegocioDetalle[]; id: string }>) {
   const [activeTab, setActiveTab] = useState("resumen");
 
   // El dato ya viene resuelto desde page.tsx

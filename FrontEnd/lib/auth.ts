@@ -22,6 +22,17 @@ export const auth = {
     });
   },
 
+  loginWithEmail: async (email: string, password: string) => {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      throw error;
+    }
+  },
+
   logout: async () => {
     const supabase = createClient();
     await supabase.auth.signOut();

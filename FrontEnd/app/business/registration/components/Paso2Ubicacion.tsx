@@ -12,7 +12,19 @@ export default function Paso2Ubicacion({
   direccionMapa,
 }: {
   formData: FormData;
-  handleUbicacionChange: (lat: number, lng: number, direccion: string) => void;
+  handleUbicacionChange: (
+    lat: number,
+    lng: number,
+    direccion: string,
+    address?: {
+      city?: string;
+      town?: string;
+      village?: string;
+      municipality?: string;
+      state?: string;
+      country?: string;
+    },
+  ) => void;
   coordenadasMapa: { lat: number; lng: number };
   direccionMapa: string;
 }) {

@@ -45,6 +45,7 @@ export type FormData = {
   // Paso 1
   nombreNegocio: string;
   categoria: string;
+  descripcion: string;
   email: string;
   telefono: string;
   sitioWeb: string;

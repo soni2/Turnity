@@ -95,7 +95,7 @@ export default function SideBar({
         </div>
 
         {/* Botón de aplicar (Opcional, los filtros aplican en tiempo real) */}
-        <button 
+        <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-800 transition-colors text-sm"
         >

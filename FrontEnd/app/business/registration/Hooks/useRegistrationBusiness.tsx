@@ -32,6 +32,7 @@ export default function useRegistrationBusiness() {
     // Paso 1: Información básica
     nombreNegocio: "",
     categoria: "",
+    descripcion: "",
     email: "",
     telefono: "",
     sitioWeb: "",
@@ -142,20 +143,47 @@ export default function useRegistrationBusiness() {
   const handleUbicacionChange = (
     lat: number,
     lng: number,
-    direccion: string,
+    direccionCompleta: string,
+    address?: {
+      city?: string;
+      town?: string;
+      village?: string;
+      municipality?: string;
+      state?: string;
+      country?: string;
+    },
   ) => {
     setCoordenadasMapa({ lat, lng });
-    setDireccionMapa(direccion);
+    setDireccionMapa(direccionCompleta);
 
-    // Actualizar el formData con la dirección y coordenadas
+    // direccion = coordenadas como string
+    const coordStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+    // ciudad = "Localidad, País" extraído del objeto Nominatim
+    const localidad =
+      address?.city ??
+      address?.town ??
+      address?.village ??
+      address?.municipality ??
+      address?.state ??
+      "";
+    const pais = address?.country ?? "";
+    const ciudadStr = localidad && pais
+      ? `${localidad}, ${pais}`
+      : localidad || pais || direccionCompleta.split(",").slice(-2).join(",").trim();
+
     setFormData((prev) => ({
       ...prev,
-      direccion: direccion.split(",")[0] || direccion, // Tomar solo la primera parte
-      coordenadas: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      direccion: coordStr,
+      coordenadas: coordStr,
+      ciudad: ciudadStr,
     }));
   };
 
-  const [negocioCreado, setNegocioCreado] = useState(false);
+  const [negocioCreado, setNegocioCreado] = useState<{
+    id: string;
+    nombre: string;
+  } | null>(null);
 
   const categorias = [
     "Barbería",
@@ -326,7 +354,7 @@ export default function useRegistrationBusiness() {
       }
 
       const responseData = await res.json();
-      const negocio = responseData.data?.[0];
+      const negocio = responseData.data;
 
       if (!negocio) {
         console.error("No se recibió la información del negocio");
@@ -381,6 +409,8 @@ export default function useRegistrationBusiness() {
         }
       }
 
+      // ✅ Marcar negocio como creado para mostrar pantalla de éxito
+      setNegocioCreado({ id: negocio.id, nombre: negocio.nombre ?? formData.nombreNegocio });
       console.log("Proceso finalizado con éxito");
     } catch (err) {
       console.error("Error crítico en handleCreate:", err);

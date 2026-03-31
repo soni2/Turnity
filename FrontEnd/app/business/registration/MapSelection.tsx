@@ -18,8 +18,23 @@ L.Icon.Default.mergeOptions({
   shadowUrl,
 });
 
+interface NominatimAddress {
+  city?: string;
+  town?: string;
+  village?: string;
+  municipality?: string;
+  state?: string;
+  country?: string;
+  country_code?: string;
+}
+
 interface Props {
-  onUbicacionChange: (lat: number, lng: number, direccion: string) => void;
+  onUbicacionChange: (
+    lat: number,
+    lng: number,
+    direccion: string,
+    address?: NominatimAddress,
+  ) => void;
   ubicacionInicial?: { lat: number; lng: number };
 }
 
@@ -98,7 +113,6 @@ export default function MapSelection({
   const obtenerDireccion = async (lat: number, lng: number) => {
     try {
       setBuscando(true);
-      // Usar Nominatim de OpenStreetMap para geocodificación inversa
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
       );
@@ -106,7 +120,7 @@ export default function MapSelection({
 
       const direccion =
         data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      onUbicacionChange(lat, lng, direccion);
+      onUbicacionChange(lat, lng, direccion, data.address ?? {});
     } catch (error) {
       console.error("Error obteniendo dirección:", error);
       onUbicacionChange(lat, lng, `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
