@@ -1,15 +1,26 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { IconArrowLeft, IconSettings, IconEdit } from "@tabler/icons-react";
+import { useEffect, useState, useCallback } from "react";
+import {
+  IconArrowLeft,
+  IconSettings,
+  IconEdit,
+  IconCheck,
+  IconX,
+  IconPlus,
+  IconTrash,
+  IconLoader2,
+  IconCalendarEvent,
+  IconUsers,
+  IconCurrencyDollar,
+  IconStar,
+} from "@tabler/icons-react";
 import Link from "next/link";
 import Image from "next/image";
 import Header from "@/app/Components/Header";
 import StatsCard from "../components/StatsCard";
-import ServiciosList from "../components/ServicesList";
-import HorariosPreview from "../components/SchedulePreview";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type NegocioDetalle = {
   id: string;
   nombre: string;
@@ -17,49 +28,342 @@ type NegocioDetalle = {
   categoria: string;
   email_contacto: string;
   telefono_contacto: string;
+  descripcion: string | null;
   direccion: string | null;
-  servicios: any[];
-  horarios: Record<string, any>;
+  ciudad: string | null;
+  horarios: Record<string, { abierto: boolean; apertura: string; cierre: string }>;
 };
 
+type Servicio = {
+  id: string;
+  nombre: string;
+  precio: number;
+  duracion: string | number;
+  descripcion: string | null;
+  activo: boolean;
+};
+
+type Empleado = {
+  id: string;
+  biografia: string | null;
+  foto_url: string | null;
+  usuario: { id: string; nombre: string } | null;
+};
+
+type Turno = {
+  id: string;
+  fecha: string;
+  hora_inicio: string;
+  estado: string;
+  cliente: { nombre: string } | null;
+  servicio: { nombre: string; precio: number } | null;
+};
+
+type Stats = {
+  citasHoy: number;
+  ingresosHoy: number;
+  empleados: number;
+};
+
+const ESTADO_COLORS: Record<string, string> = {
+  pendiente: "bg-yellow-100 text-yellow-700",
+  confirmado: "bg-green-100 text-green-700",
+  completado: "bg-blue-100 text-blue-700",
+  cancelado: "bg-red-100 text-red-600",
+};
+
+const DIAS_MAP = [
+  { key: "lunes", label: "Lunes" },
+  { key: "martes", label: "Martes" },
+  { key: "miercoles", label: "Miércoles" },
+  { key: "jueves", label: "Jueves" },
+  { key: "viernes", label: "Viernes" },
+  { key: "sabado", label: "Sábado" },
+  { key: "domingo", label: "Domingo" },
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function BusinessDashboardLayout({
   data,
-}: React.PropsWithChildren<{ data: NegocioDetalle[]; id: string }>) {
+  id,
+}: {
+  data: NegocioDetalle[];
+  id: string;
+}) {
+  const supabase = createClient();
+
+  // ── State ──────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("resumen");
+  const [negocio, setNegocio] = useState<NegocioDetalle>(data[0]);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [turnos, setTurnos] = useState<Turno[]>([]);
+  const [stats, setStats] = useState<Stats>({ citasHoy: 0, ingresosHoy: 0, empleados: 0 });
+  const [dataLoading, setDataLoading] = useState(true);
 
-  // El dato ya viene resuelto desde page.tsx
-  const negocio = data[0];
+  // Filtros de citas
+  const [fechaCitas, setFechaCitas] = useState("");
+  const [verTodasPendientes, setVerTodasPendientes] = useState(false);
 
-  // --- DATOS MOCK DE EJEMPLO MIENTRAS SE CONECTA EL BACKEND ---
-  const mockServicios = negocio.servicios?.length ? negocio.servicios : [
-    { id: "s1", nombre: "Corte Clásico", precio: 500, duracion: 30 },
-    { id: "s2", nombre: "Arreglo de Barba", precio: 300, duracion: 20 },
-    { id: "s3", nombre: "Masaje Facial", precio: 800, duracion: 45 },
-    { id: "s4", nombre: "Tinte Profesional", precio: 1500, duracion: 90 },
-  ];
+  // Edit modals
+  const [editInfoOpen, setEditInfoOpen] = useState(false);
+  const [editHorariosOpen, setEditHorariosOpen] = useState(false);
+  const [editServicioModal, setEditServicioModal] = useState<Servicio | null | "nuevo">(null);
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [savingHorarios, setSavingHorarios] = useState(false);
+  const [savingServicio, setSavingServicio] = useState(false);
 
-  const mockCitas = [
-    { id: "c1", cliente: "Carlos Rodríguez", servicio: "Corte Clásico", hora: "10:30 AM", estado: "Confirmada", color: "bg-green-100 text-green-700" },
-    { id: "c2", cliente: "Luis Medina", servicio: "Arreglo de Barba", hora: "11:15 AM", estado: "Pendiente", color: "bg-yellow-100 text-yellow-700" },
-    { id: "c3", cliente: "Ana Paulino", servicio: "Tinte Profesional", hora: "02:00 PM", estado: "En curso", color: "bg-blue-100 text-blue-700" },
-    { id: "c4", cliente: "Manuel Pérez", servicio: "Corte Clásico", hora: "04:30 PM", estado: "Confirmada", color: "bg-green-100 text-green-700" },
-  ];
+  // Edit state copies
+  const [infoEdit, setInfoEdit] = useState({
+    nombre: negocio.nombre || "",
+    email_contacto: negocio.email_contacto || "",
+    telefono_contacto: negocio.telefono_contacto || "",
+    descripcion: negocio.descripcion || "",
+    categoria: negocio.categoria || "",
+  });
+  const [horariosEdit, setHorariosEdit] = useState({ ...negocio.horarios });
+  const [servicioEdit, setServicioEdit] = useState({
+    nombre: "",
+    precio: 0,
+    duracion: "",
+    descripcion: "",
+  });
 
-  const mockEquipo = [
-    { id: "e1", nombre: "Alexander de la Cruz", rol: "Barbero Principal", especialidad: "Cortes Urbanos" },
-    { id: "e2", nombre: "María Santos", rol: "Estilista", especialidad: "Colorimetría y Peinados" },
-  ];
+  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+
+  // ── Fetch helpers ──────────────────────────────────────────────────────────
+  const fetchAll = useCallback(async () => {
+    setDataLoading(true);
+    const today = new Date().toISOString().split("T")[0];
+
+    // Servicios
+    const { data: srvData } = await supabase
+      .from("servicio")
+      .select("id, nombre, precio, duracion, descripcion, activo")
+      .eq("negocio_id", id)
+      .order("nombre");
+
+    // Empleados
+    const { data: empData } = await supabase
+      .from("empleado")
+      .select("id, biografia, foto_url, usuario:usuario_id(id, nombre)")
+      .eq("negocio_id", id)
+      .eq("activo", true);
+
+    // Todas las citas futuras y pasadas para cargarlas en tabla y poder filtrar
+    const { data: turnosData } = await supabase
+      .from("turno")
+      .select(`
+        id, fecha, hora_inicio, estado,
+        servicio:servicio_id(nombre, precio),
+        cliente:cliente_id(nombre)
+      `)
+      .in("empleado_id", (empData || []).map((e: any) => e.id))
+      .order("fecha", { ascending: true })
+      .order("hora_inicio", { ascending: true });
+
+    setFechaCitas(today);
+
+    // Turnos de hoy para stats
+    const { data: turnosHoy } = await supabase
+      .from("turno")
+      .select("id, hora_inicio, estado, servicio:servicio_id(precio)")
+      .in(
+        "empleado_id",
+        (empData || []).map((e: any) => e.id),
+      )
+      .eq("fecha", today);
+
+    const ingresosHoy = (turnosHoy || [])
+      .filter((t: any) => t.estado === "completado")
+      .reduce((acc: number, t: any) => acc + (t.servicio?.precio ?? 0), 0);
+
+    setServicios((srvData as Servicio[]) || []);
+    setEmpleados((empData as any[]) || []);
+    setTurnos((turnosData as any[]) || []);
+    setStats({
+      citasHoy: (turnosHoy || []).filter((t: any) => t.estado !== "cancelado").length,
+      ingresosHoy,
+      empleados: (empData || []).length,
+    });
+
+    setDataLoading(false);
+  }, [id, supabase]);
+
+  const fetchTurnos = useCallback(async () => {
+    const { data: empData } = await supabase
+      .from("empleado")
+      .select("id")
+      .eq("negocio_id", id)
+      .eq("activo", true);
+
+    if (!empData || empData.length === 0) return;
+
+    const { data: turnosData } = await supabase
+      .from("turno")
+      .select(`
+        id, fecha, hora_inicio, estado,
+        servicio:servicio_id(nombre, precio),
+        cliente:cliente_id(nombre)
+      `)
+      .in("empleado_id", empData.map((e: any) => e.id))
+      .order("fecha", { ascending: true })
+      .order("hora_inicio", { ascending: true });
+
+    setTurnos((turnosData as any[]) || []);
+  }, [id, supabase]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  // ── Show toast ─────────────────────────────────────────────────────────────
+  const showToast = (msg: string, type: "ok" | "err" = "ok") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // ── Save info básica ────────────────────────────────────────────────────────
+  const handleSaveInfo = async () => {
+    setSavingInfo(true);
+    const { error } = await supabase
+      .from("negocio")
+      .update({
+        nombre: infoEdit.nombre,
+        email_contacto: infoEdit.email_contacto,
+        telefono_contacto: infoEdit.telefono_contacto,
+        descripcion: infoEdit.descripcion,
+        categoria: infoEdit.categoria,
+      })
+      .eq("id", id);
+
+    setSavingInfo(false);
+    if (error) {
+      showToast("Error al guardar la información.", "err");
+    } else {
+      setNegocio((prev) => ({ ...prev, ...infoEdit }));
+      setEditInfoOpen(false);
+      showToast("Información actualizada correctamente.");
+    }
+  };
+
+  // ── Save horarios ───────────────────────────────────────────────────────────
+  const handleSaveHorarios = async () => {
+    setSavingHorarios(true);
+    const { error } = await supabase
+      .from("negocio")
+      .update({ horarios: horariosEdit })
+      .eq("id", id);
+
+    setSavingHorarios(false);
+    if (error) {
+      showToast("Error al guardar los horarios.", "err");
+    } else {
+      setNegocio((prev) => ({ ...prev, horarios: horariosEdit }));
+      setEditHorariosOpen(false);
+      showToast("Horarios actualizados correctamente.");
+    }
+  };
+
+  // ── Save servicio ──────────────────────────────────────────────────────────
+  const handleSaveServicio = async () => {
+    setSavingServicio(true);
+    if (editServicioModal === "nuevo") {
+      const { error } = await supabase.from("servicio").insert({
+        negocio_id: id,
+        nombre: servicioEdit.nombre,
+        precio: servicioEdit.precio,
+        duracion: servicioEdit.duracion,
+        descripcion: servicioEdit.descripcion || null,
+        activo: true,
+      });
+      setSavingServicio(false);
+      if (error) {
+        showToast("Error al crear el servicio.", "err");
+      } else {
+        setEditServicioModal(null);
+        showToast("Servicio creado correctamente.");
+        fetchAll();
+      }
+    } else if (editServicioModal) {
+      const { error } = await supabase
+        .from("servicio")
+        .update({
+          nombre: servicioEdit.nombre,
+          precio: servicioEdit.precio,
+          duracion: servicioEdit.duracion,
+          descripcion: servicioEdit.descripcion || null,
+        })
+        .eq("id", editServicioModal.id);
+      setSavingServicio(false);
+      if (error) {
+        showToast("Error al actualizar el servicio.", "err");
+      } else {
+        setEditServicioModal(null);
+        showToast("Servicio actualizado correctamente.");
+        fetchAll();
+      }
+    }
+  };
+
+  // ── Toggle servicio activo ─────────────────────────────────────────────────
+  const handleToggleServicio = async (srv: Servicio) => {
+    const { error } = await supabase
+      .from("servicio")
+      .update({ activo: !srv.activo })
+      .eq("id", srv.id);
+    if (!error) {
+      setServicios((prev) =>
+        prev.map((s) => (s.id === srv.id ? { ...s, activo: !s.activo } : s)),
+      );
+    }
+  };
+
+  // ── Cambiar estado de turno ────────────────────────────────────────────────
+  const handleCambiarEstadoTurno = async (turnoId: string, nuevoEstado: string) => {
+    const { error } = await supabase
+      .from("turno")
+      .update({ estado: nuevoEstado })
+      .eq("id", turnoId);
+    if (!error) {
+      setTurnos((prev) =>
+        prev.map((t) => (t.id === turnoId ? { ...t, estado: nuevoEstado } : t)),
+      );
+      showToast(`Cita actualizada a "${nuevoEstado}".`);
+    } else {
+      showToast("Error al cambiar estado.", "err");
+    }
+  };
 
   if (!negocio) return null;
 
+  const turnosMostrar = verTodasPendientes
+    ? turnos.filter((t) => t.estado === "pendiente")
+    : turnos.filter((t) => t.fecha === fechaCitas);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header variant="app" />
 
-      {/* Sub-header de navegación y perfil del negocio (Sticky) */}
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 transition-all ${
+            toast.type === "ok"
+              ? "bg-green-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.type === "ok" ? <IconCheck size={16} /> : <IconX size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Sub-header sticky */}
       <div className="bg-white border-b sticky top-[64px] z-10 shadow-sm mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Fila superior: Volver y Acciones */}
+          {/* Volver + Editar info */}
           <div className="flex items-center justify-between py-4">
             <Link
               href="/dashboard"
@@ -67,15 +371,25 @@ export default function BusinessDashboardLayout({
             >
               <IconArrowLeft size={16} className="mr-1" /> Volver a mis negocios
             </Link>
-
-            <div className="flex gap-2">
-              <button className="p-2 text-gray-400 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <IconSettings size={20} />
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setInfoEdit({
+                  nombre: negocio.nombre || "",
+                  email_contacto: negocio.email_contacto || "",
+                  telefono_contacto: negocio.telefono_contacto || "",
+                  descripcion: negocio.descripcion || "",
+                  categoria: negocio.categoria || "",
+                });
+                setEditInfoOpen(true);
+              }}
+              className="flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <IconEdit size={15} />
+              Editar negocio
+            </button>
           </div>
 
-          {/* Fila media: Info del negocio */}
+          {/* Info del negocio */}
           <div className="flex items-center gap-4 pb-6">
             <div className="h-16 w-16 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 relative">
               {negocio.logo_url ? (
@@ -87,23 +401,21 @@ export default function BusinessDashboardLayout({
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center font-bold text-gray-400 text-xl">
-                  {/* {negocio.nombre.charAt(0)} */}
+                  {negocio.nombre.charAt(0)}
                 </div>
               )}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {negocio.nombre}
-              </h1>
+              <h1 className="text-2xl font-bold text-gray-900">{negocio.nombre}</h1>
               <p className="text-sm text-gray-500">
-                {negocio.categoria} • {negocio.direccion || "Sin dirección"}
+                {negocio.categoria} • {negocio.ciudad || "Sin dirección"}
               </p>
             </div>
           </div>
 
-          {/* Fila inferior: Tabs de navegación */}
-          <div className="flex space-x-8 overflow-x-auto no-scrollbar">
-            {["Resumen", "Servicios", "Citas", "Equipo"].map((tab) => {
+          {/* Tabs */}
+          <div className="flex space-x-8 overflow-x-auto">
+            {["Resumen", "Servicios", "Equipo"].map((tab) => {
               const tabId = tab.toLowerCase();
               return (
                 <button
@@ -123,48 +435,225 @@ export default function BusinessDashboardLayout({
         </div>
       </div>
 
-      {/* Contenido principal limitado por max-w-7xl */}
+      {/* Contenido principal */}
       <main className="flex-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+          {/* ── TAB: RESUMEN ─────────────────────────────────────── */}
           {activeTab === "resumen" && (
             <div className="space-y-6">
-              {/* Stats Grid */}
+              {/* Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatsCard title="Citas hoy" value="12" />
-                <StatsCard title="Ingresos hoy" value="RD$ 8,500" />
-                <StatsCard title="Nuevos clientes (Mes)" value="15" />
-                <StatsCard title="Calificación media" value="4.8 ★" />
+                <StatsCard
+                  title="Citas hoy"
+                  value={dataLoading ? "..." : String(stats.citasHoy)}
+                  icon={<IconCalendarEvent size={20} className="text-[var(--primary)]" />}
+                />
+                <StatsCard
+                  title="Ingresos hoy"
+                  value={dataLoading ? "..." : `RD$ ${stats.ingresosHoy.toLocaleString("es-DO")}`}
+                  icon={<IconCurrencyDollar size={20} className="text-green-600" />}
+                />
+                <StatsCard
+                  title="Empleados activos"
+                  value={dataLoading ? "..." : String(stats.empleados)}
+                  icon={<IconUsers size={20} className="text-blue-600" />}
+                />
+                <StatsCard
+                  title="Servicios activos"
+                  value={dataLoading ? "..." : String(servicios.filter((s) => s.activo).length)}
+                  icon={<IconStar size={20} className="text-amber-500" />}
+                />
               </div>
 
               {/* Contenido inferior */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                  <ServiciosList servicios={mockServicios} />
-                </div>
-                <div className="lg:col-span-1 space-y-6">
-                  <HorariosPreview horarios={negocio.horarios || {}} />
+                {/* Citas rápido */}
+                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                    <h3 className="text-xl font-bold text-gray-900">Gestión de Citas</h3>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                        <button
+                          onClick={() => setVerTodasPendientes(false)}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${!verTodasPendientes ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                          Por fecha
+                        </button>
+                        <button
+                          onClick={() => setVerTodasPendientes(true)}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${verTodasPendientes ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                          Pendientes
+                        </button>
+                      </div>
+                      {!verTodasPendientes && (
+                        <input
+                          type="date"
+                          value={fechaCitas}
+                          onChange={(e) => setFechaCitas(e.target.value)}
+                          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-gray-50"
+                        />
+                      )}
+                    </div>
+                  </div>
 
-                  {/* Tarjeta de Contacto / Info */}
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-900">
-                        Información
-                      </h3>
-                      <button className="text-[var(--primary)] text-sm font-medium flex items-center gap-1 hover:underline">
-                        <IconEdit size={14} /> Editar
+                  {dataLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-16 bg-gray-100 animate-pulse rounded-xl" />
+                      ))}
+                    </div>
+                  ) : turnosMostrar.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <IconCalendarEvent size={48} className="mx-auto mb-3 opacity-40" stroke={1.5} />
+                      <p className="text-lg font-medium">No hay citas para mostrar</p>
+                      <p className="text-sm mt-1">Prueba seleccionando otra fecha o filtro</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 text-sm text-gray-400">
+                            <th className="pb-3 font-medium">Fecha</th>
+                            <th className="pb-3 font-medium">Hora</th>
+                            <th className="pb-3 font-medium">Cliente</th>
+                            <th className="pb-3 font-medium">Servicio</th>
+                            <th className="pb-3 font-medium">Estado</th>
+                            <th className="pb-3 font-medium text-right">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {turnosMostrar.map((turno) => (
+                            <tr key={turno.id} className="border-b border-gray-50 last:border-0">
+                              <td className="py-4 text-sm text-gray-600">{turno.fecha}</td>
+                              <td className="py-4 text-sm font-semibold text-gray-900">
+                                {turno.hora_inicio}
+                              </td>
+                              <td className="py-4 text-sm font-medium text-gray-700">
+                                {(turno.cliente as any)?.nombre ?? "Cliente"}
+                              </td>
+                              <td className="py-4 text-sm text-gray-500">
+                                {turno.servicio?.nombre ?? "—"}
+                              </td>
+                              <td className="py-4">
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${
+                                    ESTADO_COLORS[turno.estado] ?? "bg-gray-100 text-gray-600"
+                                  }`}
+                                >
+                                  {turno.estado}
+                                </span>
+                              </td>
+                              <td className="py-4 text-right">
+                                <div className="flex justify-end gap-1">
+                                  {turno.estado === "pendiente" && (
+                                    <button
+                                      onClick={() => handleCambiarEstadoTurno(turno.id, "confirmado")}
+                                      className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                                    >
+                                      Confirmar
+                                    </button>
+                                  )}
+                                  {(turno.estado === "pendiente" || turno.estado === "confirmado") && (
+                                    <>
+                                      <button
+                                        onClick={() => handleCambiarEstadoTurno(turno.id, "completado")}
+                                        className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                                      >
+                                        Completar
+                                      </button>
+                                      <button
+                                        onClick={() => handleCambiarEstadoTurno(turno.id, "cancelado")}
+                                        className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Horarios + Info */}
+                <div className="space-y-4">
+                  {/* Horarios */}
+                  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-gray-900">Horarios</h3>
+                      <button
+                        onClick={() => {
+                          setHorariosEdit({ ...negocio.horarios });
+                          setEditHorariosOpen(true);
+                        }}
+                        className="text-xs text-[var(--primary)] flex items-center gap-1 hover:underline"
+                      >
+                        <IconEdit size={12} /> Editar
                       </button>
                     </div>
-                    <div className="space-y-3 text-sm text-gray-600">
+                    <div className="space-y-2">
+                      {DIAS_MAP.map((dia) => {
+                        const config = negocio.horarios?.[dia.key];
+                        const isOpen = config?.abierto;
+                        return (
+                          <div
+                            key={dia.key}
+                            className="flex justify-between items-center text-sm border-b border-gray-50 pb-1.5 last:border-0"
+                          >
+                            <span className="text-gray-600 font-medium">{dia.label}</span>
+                            <span className={isOpen ? "text-gray-900" : "text-gray-400"}>
+                              {isOpen ? `${config.apertura} - ${config.cierre}` : "Cerrado"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Info contacto */}
+                  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-gray-900">Información</h3>
+                      <button
+                        onClick={() => {
+                          setInfoEdit({
+                            nombre: negocio.nombre || "",
+                            email_contacto: negocio.email_contacto || "",
+                            telefono_contacto: negocio.telefono_contacto || "",
+                            descripcion: negocio.descripcion || "",
+                            categoria: negocio.categoria || "",
+                          });
+                          setEditInfoOpen(true);
+                        }}
+                        className="text-xs text-[var(--primary)] flex items-center gap-1 hover:underline"
+                      >
+                        <IconEdit size={12} /> Editar
+                      </button>
+                    </div>
+                    <div className="space-y-2 text-sm text-gray-600">
                       <p>
-                        <strong>Email:</strong>
+                        <span className="font-medium text-gray-800">Email:</span>
                         <br />
                         {negocio.email_contacto || "No configurado"}
                       </p>
                       <p>
-                        <strong>Teléfono:</strong>
+                        <span className="font-medium text-gray-800">Teléfono:</span>
                         <br />
                         {negocio.telefono_contacto || "No configurado"}
                       </p>
+                      {negocio.descripcion && (
+                        <p>
+                          <span className="font-medium text-gray-800">Descripción:</span>
+                          <br />
+                          {negocio.descripcion}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -172,74 +661,485 @@ export default function BusinessDashboardLayout({
             </div>
           )}
 
+          {/* ── TAB: SERVICIOS ───────────────────────────────────── */}
           {activeTab === "servicios" && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <ServiciosList servicios={mockServicios} />
-            </div>
-          )}
-
-          {activeTab === "citas" && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-900">Gestión de Citas Hoy</h3>
-                <button className="text-sm bg-[var(--primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-all">Nueva Cita</button>
+                <h3 className="text-xl font-bold text-gray-900">Servicios</h3>
+                <button
+                  onClick={() => {
+                    setServicioEdit({ nombre: "", precio: 0, duracion: "", descripcion: "" });
+                    setEditServicioModal("nuevo");
+                  }}
+                  className="flex items-center gap-1.5 text-sm bg-[var(--primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-all"
+                >
+                  <IconPlus size={16} /> Nuevo servicio
+                </button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-sm text-gray-400">
-                      <th className="pb-3 font-medium">Hora</th>
-                      <th className="pb-3 font-medium">Cliente</th>
-                      <th className="pb-3 font-medium">Servicio</th>
-                      <th className="pb-3 font-medium">Estado</th>
-                      <th className="pb-3 font-medium text-right">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mockCitas.map((cita) => (
-                      <tr key={cita.id} className="border-b border-gray-50 last:border-0">
-                        <td className="py-4 text-sm font-semibold text-gray-900">{cita.hora}</td>
-                        <td className="py-4 text-sm font-medium text-gray-700">{cita.cliente}</td>
-                        <td className="py-4 text-sm text-gray-500">{cita.servicio}</td>
-                        <td className="py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${cita.color}`}>
-                            {cita.estado}
+
+              {dataLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-14 bg-gray-100 animate-pulse rounded-xl" />
+                  ))}
+                </div>
+              ) : servicios.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <p className="text-lg font-medium">No hay servicios registrados</p>
+                  <p className="text-sm mt-1">Agrega el primer servicio de tu negocio</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {servicios.map((srv) => (
+                    <div
+                      key={srv.id}
+                      className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                        srv.activo
+                          ? "border-gray-100 bg-white"
+                          : "border-gray-100 bg-gray-50 opacity-60"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900">{srv.nombre}</p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-xs text-gray-500">
+                            {srv.duracion} min
                           </span>
-                        </td>
-                        <td className="py-4 text-right">
-                          <button className="text-gray-400 hover:text-[var(--primary)] transition-colors"><IconEdit size={18} /></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          {srv.descripcion && (
+                            <span className="text-xs text-gray-400 truncate max-w-[200px]">
+                              {srv.descripcion}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 ml-4">
+                        <span className="font-semibold text-gray-900 whitespace-nowrap">
+                          RD$ {srv.precio}
+                        </span>
+                        {/* Toggle activo/inactivo */}
+                        <button
+                          onClick={() => handleToggleServicio(srv)}
+                          title={srv.activo ? "Desactivar" : "Activar"}
+                          className={`w-10 h-5 rounded-full transition-colors relative ${
+                            srv.activo ? "bg-green-500" : "bg-gray-300"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                              srv.activo ? "translate-x-5" : ""
+                            }`}
+                          />
+                        </button>
+                        {/* Editar */}
+                        <button
+                          onClick={() => {
+                            setServicioEdit({
+                              nombre: srv.nombre,
+                              precio: srv.precio,
+                              duracion: String(srv.duracion),
+                              descripcion: srv.descripcion || "",
+                            });
+                            setEditServicioModal(srv);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-[var(--primary)] transition-colors rounded-lg hover:bg-purple-50"
+                        >
+                          <IconEdit size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
+
+
+          {/* ── TAB: EQUIPO ──────────────────────────────────────── */}
           {activeTab === "equipo" && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-900">Mi Equipo</h3>
-                <button className="text-sm bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition-all">Agregar Miembro</button>
+              <div className="flex justify-between flex-col md:flex-row md:items-center gap-4 mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Mi Equipo</h3>
+                  <p className="text-sm text-gray-500 mt-1">Comparte este enlace para que otros profesionales se unan a tu negocio.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const inviteLink = `${window.location.origin}/business-registration/join?negocio_id=${id}`;
+                    navigator.clipboard.writeText(inviteLink);
+                    if (typeof showToast !== 'undefined') {
+                       showToast("¡Enlace de invitación copiado al portapapeles!");
+                    }
+                  }}
+                  className="text-sm bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition-all flex items-center gap-2 whitespace-nowrap"
+                >
+                  <IconPlus size={16} /> Copiar enlace de invitación
+                </button>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {mockEquipo.map((miembro) => (
-                  <div key={miembro.id} className="border border-gray-100 rounded-xl p-5 hover:shadow-sm transition-all flex flex-col items-center text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full mb-3 flex items-center justify-center text-gray-400 font-bold text-xl uppercase">
-                      {miembro.nombre.charAt(0)}
+
+              {dataLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-36 bg-gray-100 animate-pulse rounded-xl" />
+                  ))}
+                </div>
+              ) : empleados.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <IconUsers size={48} className="mx-auto mb-3 opacity-40" stroke={1.5} />
+                  <p className="text-lg font-medium">No hay empleados registrados</p>
+                  <p className="text-sm mt-1">
+                    Los empleados que se unan al negocio aparecerán aquí
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {empleados.map((emp) => (
+                    <div
+                      key={emp.id}
+                      className="border border-gray-100 rounded-xl p-5 hover:shadow-sm transition-all flex flex-col items-center text-center"
+                    >
+                      <div className="w-16 h-16 rounded-full mb-3 overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 relative">
+                        {emp.foto_url ? (
+                          <Image
+                            src={emp.foto_url}
+                            alt={(emp.usuario as any)?.nombre ?? "Empleado"}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xl">
+                            {((emp.usuario as any)?.nombre ?? "?").charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <h4 className="font-bold text-gray-900 line-clamp-1">
+                        {(emp.usuario as any)?.nombre ?? "Empleado"}
+                      </h4>
+                      {emp.biografia && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{emp.biografia}</p>
+                      )}
                     </div>
-                    <h4 className="font-bold text-gray-900 line-clamp-1">{miembro.nombre}</h4>
-                    <p className="text-sm text-[var(--primary)] font-medium mb-1">{miembro.rol}</p>
-                    <p className="text-xs text-gray-500">{miembro.especialidad}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
       </main>
+
+      {/* ─── Modal: Editar Información Básica ─────────────────────────────── */}
+      {editInfoOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-[var(--primary)] to-purple-700 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-white font-semibold">Editar información del negocio</h2>
+              <button
+                onClick={() => setEditInfoOpen(false)}
+                className="text-white/70 hover:text-white"
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre del negocio
+                </label>
+                <input
+                  type="text"
+                  value={infoEdit.nombre}
+                  onChange={(e) => setInfoEdit((p) => ({ ...p, nombre: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                <select
+                  value={infoEdit.categoria}
+                  onChange={(e) => setInfoEdit((p) => ({ ...p, categoria: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                >
+                  {[
+                    "Barbería",
+                    "Salón de belleza",
+                    "Centro de uñas",
+                    "Spa",
+                    "Centro de estética",
+                    "Peluquería infantil",
+                    "Centro de depilación",
+                    "Otro",
+                  ].map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email de contacto
+                </label>
+                <input
+                  type="email"
+                  value={infoEdit.email_contacto}
+                  onChange={(e) =>
+                    setInfoEdit((p) => ({ ...p, email_contacto: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="tel"
+                  value={infoEdit.telefono_contacto}
+                  onChange={(e) =>
+                    setInfoEdit((p) => ({ ...p, telefono_contacto: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <textarea
+                  value={infoEdit.descripcion}
+                  onChange={(e) => setInfoEdit((p) => ({ ...p, descripcion: e.target.value }))}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
+                  placeholder="Describe brevemente tu negocio..."
+                />
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setEditInfoOpen(false)}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveInfo}
+                disabled={savingInfo}
+                className="flex-1 py-2.5 bg-[var(--primary)] text-white rounded-xl font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {savingInfo ? (
+                  <IconLoader2 size={16} className="animate-spin" />
+                ) : (
+                  <IconCheck size={16} />
+                )}
+                Guardar cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Editar Horarios ────────────────────────────────────────── */}
+      {editHorariosOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-gradient-to-r from-[var(--primary)] to-purple-700 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-white font-semibold">Editar horarios</h2>
+              <button
+                onClick={() => setEditHorariosOpen(false)}
+                className="text-white/70 hover:text-white"
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-3">
+              {DIAS_MAP.map(({ key, label }) => {
+                const diaConfig = horariosEdit[key] ?? {
+                  abierto: false,
+                  apertura: "09:00",
+                  cierre: "20:00",
+                };
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-gray-100"
+                  >
+                    <div className="w-24 shrink-0">
+                      <span className="text-sm font-medium text-gray-700">{label}</span>
+                    </div>
+                    {/* Toggle */}
+                    <button
+                      onClick={() =>
+                        setHorariosEdit((prev) => ({
+                          ...prev,
+                          [key]: { ...diaConfig, abierto: !diaConfig.abierto },
+                        }))
+                      }
+                      className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${
+                        diaConfig.abierto ? "bg-green-500" : "bg-gray-300"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                          diaConfig.abierto ? "translate-x-5" : ""
+                        }`}
+                      />
+                    </button>
+                    {diaConfig.abierto ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="time"
+                          value={diaConfig.apertura}
+                          onChange={(e) =>
+                            setHorariosEdit((prev) => ({
+                              ...prev,
+                              [key]: { ...diaConfig, apertura: e.target.value },
+                            }))
+                          }
+                          className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] flex-1"
+                        />
+                        <span className="text-gray-400 text-sm">–</span>
+                        <input
+                          type="time"
+                          value={diaConfig.cierre}
+                          onChange={(e) =>
+                            setHorariosEdit((prev) => ({
+                              ...prev,
+                              [key]: { ...diaConfig, cierre: e.target.value },
+                            }))
+                          }
+                          className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] flex-1"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">Cerrado</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="px-6 pb-6 flex gap-3 border-t pt-4">
+              <button
+                onClick={() => setEditHorariosOpen(false)}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveHorarios}
+                disabled={savingHorarios}
+                className="flex-1 py-2.5 bg-[var(--primary)] text-white rounded-xl font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {savingHorarios ? (
+                  <IconLoader2 size={16} className="animate-spin" />
+                ) : (
+                  <IconCheck size={16} />
+                )}
+                Guardar horarios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Crear / Editar Servicio ───────────────────────────────── */}
+      {editServicioModal !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-[var(--primary)] to-purple-700 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-white font-semibold">
+                {editServicioModal === "nuevo" ? "Nuevo servicio" : "Editar servicio"}
+              </h2>
+              <button
+                onClick={() => setEditServicioModal(null)}
+                className="text-white/70 hover:text-white"
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre del servicio
+                </label>
+                <input
+                  type="text"
+                  value={servicioEdit.nombre}
+                  onChange={(e) =>
+                    setServicioEdit((p) => ({ ...p, nombre: e.target.value }))
+                  }
+                  placeholder="Ej. Corte clásico"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Precio (RD$)
+                  </label>
+                  <input
+                    type="number"
+                    value={servicioEdit.precio}
+                    onChange={(e) =>
+                      setServicioEdit((p) => ({ ...p, precio: Number(e.target.value) }))
+                    }
+                    min={0}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Duración (min)
+                  </label>
+                  <input
+                    type="number"
+                    value={servicioEdit.duracion}
+                    onChange={(e) =>
+                      setServicioEdit((p) => ({ ...p, duracion: e.target.value }))
+                    }
+                    min={1}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Descripción (opcional)
+                </label>
+                <textarea
+                  value={servicioEdit.descripcion}
+                  onChange={(e) =>
+                    setServicioEdit((p) => ({ ...p, descripcion: e.target.value }))
+                  }
+                  rows={2}
+                  placeholder="Descripción breve del servicio..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
+                />
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setEditServicioModal(null)}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveServicio}
+                disabled={
+                  savingServicio ||
+                  !servicioEdit.nombre.trim() ||
+                  !servicioEdit.precio ||
+                  !servicioEdit.duracion
+                }
+                className="flex-1 py-2.5 bg-[var(--primary)] text-white rounded-xl font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {savingServicio ? (
+                  <IconLoader2 size={16} className="animate-spin" />
+                ) : (
+                  <IconCheck size={16} />
+                )}
+                {editServicioModal === "nuevo" ? "Crear servicio" : "Guardar cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

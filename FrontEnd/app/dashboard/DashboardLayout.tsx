@@ -1,5 +1,6 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   IconPlus,
   IconBriefcase,
@@ -23,41 +24,133 @@ import {
 import { Negocio } from "./hooks/useDashboard";
 import Header from "../Components/Header";
 
-// Datos harcodeados para el ejemplo
-const STATS_GENERALES = [
-  {
-    id: 1,
-    label: "Total Clientes",
-    value: "5,000",
-    change: "+2.5%",
-    icon: <IconUsers className="text-blue-600" />,
-  },
-  {
-    id: 2,
-    label: "Completados",
-    value: "5,000",
-    change: "+2.5%",
-    icon: <IconCheck className="text-green-600" />,
-  },
-  {
-    id: 3,
-    label: "Cancelados",
-    value: "5,00",
-    change: "+2.5%",
-    icon: <IconX className="text-red-600" />,
-  },
-];
-
 export default function MisNegocioDashboard({
   negocio = [],
   loading = false,
 }: React.PropsWithChildren<{ negocio?: Negocio[] | null; loading?: boolean }>) {
-  // Transformación de datos para el gráfico radial (Ingresos del día por negocio)
+  const supabase = createClient();
+  const [statsGenerales, setStatsGenerales] = useState({
+    totalClientes: 0,
+    completados: 0,
+    cancelados: 0,
+  });
+  const [businessStats, setBusinessStats] = useState<
+    Record<string, { ingresosHoy: number; citasHoy: number; ingresosTotal: number }>
+  >({});
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    if (!negocio || negocio.length === 0) {
+      setLoadingStats(false);
+      return;
+    }
+
+    const fetchStats = async () => {
+      setLoadingStats(true);
+      const negocioIds = negocio.map((n) => n.id);
+
+      // 1. Obtener empleados de estos negocios
+      const { data: empleados } = await supabase
+        .from("empleado")
+        .select("id, negocio_id")
+        .in("negocio_id", negocioIds);
+
+      if (!empleados || empleados.length === 0) {
+        setLoadingStats(false);
+        return;
+      }
+
+      const empleadoIds = empleados.map((e) => e.id);
+      const empleadoToNegocio = empleados.reduce((acc, emp) => {
+        acc[emp.id] = emp.negocio_id;
+        return acc;
+      }, {} as Record<string, string>);
+
+      // 2. Obtener turnos
+      const today = new Date().toISOString().split("T")[0];
+      const { data: turnos } = await supabase
+        .from("turno")
+        .select(`
+          id,
+          estado,
+          fecha,
+          cliente_id,
+          empleado_id,
+          servicio:servicio_id(precio)
+        `)
+        .in("empleado_id", empleadoIds);
+
+      if (turnos) {
+        const uniqueClients = new Set(turnos.map((t) => t.cliente_id).filter(Boolean));
+        const completados = turnos.filter((t) => t.estado === "completado").length;
+        const cancelados = turnos.filter((t) => t.estado === "cancelado").length;
+
+        setStatsGenerales({
+          totalClientes: uniqueClients.size,
+          completados,
+          cancelados,
+        });
+
+        // Calcular stats por negocio
+        const bStats: Record<string, { ingresosHoy: number; citasHoy: number; ingresosTotal: number }> = {};
+        negocio.forEach((n) => {
+          bStats[n.id] = { ingresosHoy: 0, citasHoy: 0, ingresosTotal: 0 };
+        });
+
+        turnos.forEach((t) => {
+          const negId = empleadoToNegocio[t.empleado_id];
+          if (!negId || !bStats[negId]) return;
+
+          const isHoy = t.fecha === today;
+          const isCompletado = t.estado === "completado";
+          const isCancelado = t.estado === "cancelado";
+          const precio = (t.servicio as any)?.precio || 0;
+
+          if (isHoy && !isCancelado) {
+            bStats[negId].citasHoy += 1;
+          }
+          if (isCompletado) {
+            bStats[negId].ingresosTotal += precio;
+            if (isHoy) bStats[negId].ingresosHoy += precio;
+          }
+        });
+
+        setBusinessStats(bStats);
+      }
+      setLoadingStats(false);
+    };
+
+    fetchStats();
+  }, [negocio, supabase]);
+
+  // Transformación de datos para el gráfico radial (Ingresos Totales por negocio)
   const chartData = (negocio || []).map((n, index) => ({
     name: n.nombre,
-    value: 4 + 1000, // Hardcoded: Ingreso del día
+    value: businessStats[n.id]?.ingresosTotal || 0,
     fill: index === 0 ? "var(--primary)" : index === 1 ? "#8b5cf6" : "#ec4899",
-  }));
+  })).filter(item => item.value > 0);
+
+  // Stats array dinámico
+  const dinamicoStats = [
+    {
+      id: 1,
+      label: "Total Clientes",
+      value: loadingStats ? "..." : String(statsGenerales.totalClientes),
+      icon: <IconUsers className="text-blue-600" />,
+    },
+    {
+      id: 2,
+      label: "Completados",
+      value: loadingStats ? "..." : String(statsGenerales.completados),
+      icon: <IconCheck className="text-green-600" />,
+    },
+    {
+      id: 3,
+      label: "Cancelados",
+      value: loadingStats ? "..." : String(statsGenerales.cancelados),
+      icon: <IconX className="text-red-600" />,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] flex flex-col">
@@ -85,16 +178,13 @@ export default function MisNegocioDashboard({
 
           {/* 1. Stats Cards (Como en la imagen) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {STATS_GENERALES.map((stat) => (
+            {dinamicoStats.map((stat) => (
               <div
                 key={stat.id}
                 className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-start"
               >
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] font-bold bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full border border-gray-100">
-                      {stat.change}
-                    </span>
                     <p className="text-sm text-gray-500 font-medium">
                       {stat.label}
                     </p>
@@ -165,15 +255,15 @@ export default function MisNegocioDashboard({
                           <div className="mt-2 flex gap-3">
                             {/* Mini métricas por negocio */}
                             <div className="text-[11px]">
-                              <span className="text-gray-400">Hoy:</span>{" "}
+                              <span className="text-gray-400">Ingresos Hoy:</span>{" "}
                               <span className="font-bold text-green-600">
-                                +$2,400
+                                {loadingStats ? "..." : `+$${businessStats[n.id]?.ingresosHoy || 0}`}
                               </span>
                             </div>
                             <div className="text-[11px]">
-                              <span className="text-gray-400">Citas:</span>{" "}
+                              <span className="text-gray-400">Citas Hoy:</span>{" "}
                               <span className="font-bold text-gray-700">
-                                12
+                                {loadingStats ? "..." : businessStats[n.id]?.citasHoy || 0}
                               </span>
                             </div>
                           </div>
@@ -208,37 +298,43 @@ export default function MisNegocioDashboard({
               </div>
 
               <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: "12px",
-                        border: "none",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "12px",
+                          border: "none",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-gray-400 text-sm">
+                    {loadingStats ? "Cargando..." : "No hay ingresos registrados aún"}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 mt-4">
-                {chartData.map((item) => (
+                {chartData.map((item, index) => (
                   <div
-                    key={item.name}
+                    key={index}
                     className="flex items-center justify-between text-sm"
                   >
                     <div className="flex items-center gap-2">
@@ -251,7 +347,7 @@ export default function MisNegocioDashboard({
                       </span>
                     </div>
                     <span className="font-bold text-gray-900">
-                      ${item.value}
+                      ${item.value.toLocaleString("es-DO")}
                     </span>
                   </div>
                 ))}

@@ -2,6 +2,7 @@
 import Logo from "../Components/Logo";
 import Input from "../Components/Input";
 import { GoogleIcon } from "../Components/Icons";
+import { IconUpload, IconUser } from "@tabler/icons-react";
 import { auth } from "@/lib/auth";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +20,18 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Estados para foto
+  const [foto, setFoto] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setFoto(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,11 +74,31 @@ export default function RegisterPage() {
 
     // 2. Insertar en la tabla pública `usuario` (si existe)
     if (data.user) {
+      let foto_url = null;
+
+      // Subir foto si existe
+      if (foto) {
+        const fileExt = foto.name.split(".").pop();
+        const fileName = `${data.user.id}-${Math.random()}.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("avatares")
+          .upload(fileName, foto);
+
+        if (!uploadError && uploadData) {
+          const { data: publicUrlData } = supabase.storage
+            .from("avatares")
+            .getPublicUrl(uploadData.path);
+          foto_url = publicUrlData.publicUrl;
+        }
+      }
+
       await supabase.from("usuario").upsert({
         id: data.user.id,
         nombre,
         email,
         telefono,
+        ...(foto_url && { foto_url }),
       });
     }
 
@@ -120,6 +153,29 @@ export default function RegisterPage() {
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* Foto de perfil */}
+            <div className="flex flex-col items-center justify-center mb-4">
+              <label className="relative cursor-pointer group">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-50 border-2 border-dashed border-gray-300 flex items-center justify-center group-hover:border-[var(--primary)] transition-colors">
+                  {previewUrl ? (
+                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <IconUser className="w-10 h-10 text-gray-400 group-hover:text-[var(--primary)] transition-colors" />
+                  )}
+                </div>
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <IconUpload className="w-6 h-6 text-white" />
+                </div>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+              </label>
+              <span className="text-xs text-gray-500 mt-2">Sube una foto (opcional)</span>
+            </div>
+
             <Input
               label="Nombre completo"
               type="text"

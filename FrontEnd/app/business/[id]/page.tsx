@@ -177,6 +177,7 @@ export default function CentroPage() {
     if (id) fetchCentroData();
   }, [id]);
 
+
   const upcomingDates = useMemo(() => {
     if (!centro) return [];
     const dates = [];
@@ -402,9 +403,9 @@ export default function CentroPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex items-center text-gray-600">
                   <IconMapPin className="h-5 w-5 mr-3 flex-shrink-0 text-[var(--primary)]" />
-                  <span>{centro.direccion || "Dirección no especificada"}</span>
+                  <span>{centro.ciudad || "Dirección no especificada"}</span>
                 </div>
-                <div className="flex items-center text-gray-600">
+              <div className="flex items-center text-gray-600">
                   <IconClock className="h-5 w-5 mr-3 flex-shrink-0 text-[var(--primary)]" />
                   <span>{centro.horario}</span>
                 </div>

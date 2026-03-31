@@ -33,6 +33,16 @@ export const auth = {
     }
   },
 
+  resetPassword: async (email: string) => {
+    const supabase = createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    });
+    if (error) {
+      throw error;
+    }
+  },
+
   logout: async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
