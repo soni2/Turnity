@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/app/Components/Header";
-import { IconMapPin, IconClock, IconPhone } from "@tabler/icons-react";
+import { IconMapPin, IconClock, IconPhone, IconStarFilled, IconStar, IconMessageCircle } from "@tabler/icons-react";
 import HorariosPreview from "@/app/dashboard/components/SchedulePreview";
 import PaymentModal from "@/app/Components/PaymentModal";
 
@@ -21,6 +21,7 @@ export default function CentroPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string>("");
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
@@ -80,6 +81,23 @@ export default function CentroPage() {
         )
         .eq("negocio_id", id)
         .eq("activo", true);
+        
+      // 4. Obtener reseñas del negocio (desde la BD)
+      const { data: resenas } = await supabase
+        .from("resena")
+        .select(`
+          id,
+          rating,
+          comentario,
+          creado_en,
+          cliente:cliente_id (nombre, avatar_url)
+        `)
+        .eq("negocio_id", id)
+        .order("creado_en", { ascending: false });
+
+      const reseñasMap = resenas || [];
+      const totalRating = reseñasMap.reduce((acc: number, curr: any) => acc + curr.rating, 0);
+      const promedioRating = reseñasMap.length > 0 ? (totalRating / reseñasMap.length).toFixed(1) : "Nuevo";
 
       // Derivar texto de horario y horarios disponibles desde negocio.horarios (JSON guardado en BD)
       const horariosRaw: Record<
@@ -168,6 +186,8 @@ export default function CentroPage() {
           sab: ["9:00", "10:00", "11:00", "12:00", "13:00"],
         },
         horariosRaw,
+        resenas: reseñasMap,
+        promedioRating
       };
 
       setCentro(formattedCentro);
@@ -240,18 +260,15 @@ export default function CentroPage() {
 
   const renderStars = (rating: number) => {
     return (
-      <div className="flex">
+      <div className="flex gap-0.5">
         {[1, 2, 3, 4, 5].map((star) => (
-          <p
-            key={star}
-            className={`h-5 w-5 ${
-              star <= rating
-                ? "text-yellow-400 fill-yellow-400"
-                : "text-gray-300"
-            }`}
-          >
-            ♥
-          </p>
+          <span key={star}>
+            {star <= Math.round(rating) ? (
+               <IconStarFilled className="h-4 w-4 md:h-5 md:w-5 text-amber-400 drop-shadow-sm" />
+            ) : (
+               <IconStar className="h-4 w-4 md:h-5 md:w-5 text-gray-300" stroke={1.5} />
+            )}
+          </span>
         ))}
       </div>
     );
@@ -356,105 +373,153 @@ export default function CentroPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna izquierda - Información del centro */}
-          <div className="lg:col-span-2">
-            {/* Fotos del negocio */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Fotos del negocio (Estilo Galería Interactiva) */}
             {centro.imagenes && centro.imagenes.length > 0 ? (
-              <div
-                className={`grid gap-4 mb-6 ${centro.imagenes.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}
-              >
-                {centro.imagenes.map((img: string, idx: number) => (
-                  <div
-                    key={idx}
-                    className="relative h-64 rounded-lg overflow-hidden bg-gray-100"
-                  >
-                    <Image
-                      src={img}
-                      alt={`${centro.nombre} - Foto ${idx + 1}`}
-                      fill
-                      className="object-cover"
-                    />
+              <div className="flex flex-col gap-3 mb-6">
+                {/* Imagen Principal */}
+                <div className="relative w-full h-64 md:h-[600px] rounded-3xl overflow-hidden bg-gray-100 shadow-sm border border-gray-100">
+                  <Image
+                    src={centro.imagenes[activeImageIndex] || centro.imagenes[0]}
+                    alt={`${centro.nombre} - Imagen destacada`}
+                    fill
+                    className="object-cover transition-opacity duration-300 ease-in-out"
+                    priority
+                  />
+                </div>
+                
+                {/* Thumbnails (Solo se muestra si hay > 1 imagen) */}
+                {centro.imagenes.length > 1 && (
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x relative z-10">
+                    {centro.imagenes.map((img: string, idx: number) => (
+                      <div
+                        key={idx}
+                        onMouseEnter={() => setActiveImageIndex(idx)}
+                        onPointerEnter={() => setActiveImageIndex(idx)} 
+                        onClick={() => setActiveImageIndex(idx)}
+                        className={`relative h-20 w-24 sm:h-20 sm:w-28 rounded-2xl overflow-hidden cursor-pointer flex-shrink-0 border-2 transition-all duration-200 snap-center ${
+                           activeImageIndex === idx 
+                            ? "border-[var(--primary)] shadow-md opacity-100 scale-[1.02]" 
+                            : "border-transparent opacity-60 hover:opacity-100 hover:border-gray-300"
+                        }`}
+                      >
+                        <Image
+                          src={img}
+                          alt={`Miniatura ${idx + 1}`}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             ) : centro.logo_url ? (
-              <div className="relative h-48 rounded-lg overflow-hidden mb-6 bg-gray-100">
+              <div className="relative h-48 md:h-64 rounded-3xl overflow-hidden bg-gray-100 shadow-sm">
                 <Image
                   src={centro.logo_url}
                   alt={centro.nombre}
                   fill
-                  className="object-contain p-4"
+                  className="object-contain p-4 hover:scale-105 transition-transform duration-500"
                 />
               </div>
             ) : null}
 
             {/* Información básica */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                  <span className="text-sm text-gray-500">
+                  <span className="inline-block px-3 py-1 bg-purple-50 text-[var(--primary)] text-xs font-semibold tracking-wide uppercase rounded-full mb-3">
                     {centro.categoria}
                   </span>
-                  <h2 className="text-2xl font-bold mt-1">{centro.nombre}</h2>
+                  <h2 className="text-3xl font-bold text-gray-900">{centro.nombre}</h2>
                 </div>
+                {centro.promedioRating !== "Nuevo" && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 px-4 py-2 rounded-2xl shrink-0">
+                     <IconStarFilled className="text-amber-500" size={24} />
+                     <div className="flex flex-col">
+                       <span className="text-lg font-bold text-amber-900 leading-none">{centro.promedioRating}</span>
+                       <span className="text-[10px] text-amber-700 font-medium uppercase tracking-wider">{centro.resenas?.length} reseñas</span>
+                     </div>
+                  </div>
+                )}
               </div>
 
-              <p className="text-gray-600 mb-4">{centro.descripcion}</p>
+              <p className="text-gray-600 mb-8 leading-relaxed text-lg">{centro.descripcion}</p>
 
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center text-gray-600">
-                  <IconMapPin className="h-5 w-5 mr-3 flex-shrink-0 text-[var(--primary)]" />
-                  <span>{centro.ciudad || "Dirección no especificada"}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                <div className="flex items-start text-gray-700">
+                  <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-sm mr-4 shrink-0">
+                    <IconMapPin className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-gray-900">Ubicación</span>
+                    <span>{centro.ciudad || "Dirección no especificada"}</span>
+                  </div>
                 </div>
-              <div className="flex items-center text-gray-600">
-                  <IconClock className="h-5 w-5 mr-3 flex-shrink-0 text-[var(--primary)]" />
-                  <span>{centro.horario}</span>
+                <div className="flex items-start text-gray-700">
+                  <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-sm mr-4 shrink-0">
+                    <IconClock className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-gray-900">Horario de hoy</span>
+                    <span>{centro.horario}</span>
+                  </div>
                 </div>
-                <div className="flex items-center text-gray-600">
-                  <IconPhone className="h-5 w-5 mr-3 flex-shrink-0 text-[var(--primary)]" />
-                  <span>{centro.telefono}</span>
+                <div className="flex items-start text-gray-700 md:col-span-2 mt-2 pt-4 border-t border-gray-200/60">
+                  <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-sm mr-4 shrink-0">
+                    <IconPhone className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-gray-900">Contacto</span>
+                    <span>{centro.telefono}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Servicios */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <h3 className="font-semibold text-lg mb-4">Servicios</h3>
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+              <h3 className="font-bold text-2xl mb-6">Nuestros Servicios</h3>
               <div className="space-y-4">
                 {centro.servicios.map((servicio: any) => (
                   <div
                     key={servicio.id}
-                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    className={`border rounded-2xl p-5 cursor-pointer transition-all duration-200 shadow-sm ${
                       selectedService === servicio.id
-                        ? "border-[var(--primary)] ring-2 ring-[var(--primary)] ring-opacity-20"
-                        : "border-gray-200 hover:border-gray-300"
-                    } ${!servicio.disponible ? "opacity-50" : ""}`}
+                        ? "border-[var(--primary)] ring-4 ring-[var(--primary)]/10 bg-purple-50 hover:bg-purple-50 shadow-purple-900/5 transform scale-[1.01]"
+                        : "border-gray-200 hover:border-[var(--primary)]/40 hover:bg-gray-50 hover:shadow-md"
+                    } ${!servicio.disponible ? "opacity-50 grayscale select-none" : ""}`}
                     onClick={() =>
                       servicio.disponible && setSelectedService(servicio.id)
                     }
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="font-medium">{servicio.nombre}</h4>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <h4 className="font-bold text-lg text-gray-900">{servicio.nombre}</h4>
+                        <p className="text-sm text-gray-600 mt-1 max-w-sm">
                           {servicio.descripcion}
                         </p>
-                        <div className="flex items-center mt-2 space-x-4">
-                          <span className="text-sm text-gray-500">
+                        <div className="flex items-center mt-3 space-x-3">
+                          <span className="text-xs font-semibold px-2 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-md flex flex-row items-center gap-2">
+                            <IconClock size={20} />
                             {servicio.duracion}
                           </span>
-                          <div className="flex items-center">
-                            {renderStars(servicio.rating)}
-                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="font-semibold text-lg">
+                      <div className="text-right flex flex-col items-end">
+                        <span className="font-bold text-xl text-[var(--primary)]">
                           RD${servicio.precio}
                         </span>
                         {!servicio.disponible && (
-                          <p className="text-xs text-red-500 mt-1">
+                          <span className="text-[10px] font-bold text-red-600 mt-2 px-2 py-1 bg-red-50 border border-red-100 rounded-md uppercase tracking-wide">
                             No disponible
-                          </p>
+                          </span>
+                        )}
+                        {selectedService === servicio.id && (
+                          <span className="mt-3 text-xs font-bold text-purple-700 flex items-center gap-1 bg-purple-100 px-2 py-1 rounded-md">
+                            <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" /> Seleccionado
+                          </span>
                         )}
                       </div>
                     </div>
@@ -469,34 +534,32 @@ export default function CentroPage() {
             </div>
 
             {/* Profesionales */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="font-semibold text-lg mb-4">
-                Nuestros Estilistas
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+              <h3 className="font-bold text-2xl mb-6">Nuestros Estilistas</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {centro.profesionales.map((pro: any) => (
                   <div
                     key={pro.id}
-                    className="flex items-center p-3 border rounded-lg"
+                    className="flex items-center p-4 bg-gray-50 border border-gray-100 rounded-2xl hover:shadow-md transition-shadow"
                   >
-                    <div className="w-12 h-12 rounded-full mr-3 overflow-hidden bg-gray-200 shrink-0">
+                    <div className="w-14 h-14 rounded-full mr-4 overflow-hidden border-2 border-white shadow-sm shrink-0">
                       {pro.foto_url ? (
                         <Image
                           src={pro.foto_url}
                           alt={pro.nombre}
-                          width={48}
-                          height={48}
+                          width={56}
+                          height={56}
                           className="object-cover w-full h-full"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg font-bold">
+                        <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xl font-bold">
                           {pro.nombre.charAt(0).toUpperCase()}
                         </div>
                       )}
                     </div>
                     <div>
-                      <h4 className="font-medium">{pro.nombre}</h4>
-                      <p className="text-xs text-gray-500">
+                      <h4 className="font-bold text-gray-900">{pro.nombre}</h4>
+                      <p className="text-sm text-[var(--primary)] font-medium">
                         {pro.especialidad}
                       </p>
                     </div>
@@ -504,6 +567,52 @@ export default function CentroPage() {
                 ))}
               </div>
             </div>
+
+            {/* Reseñas (Reviews tomadas desde DB) */}
+            {centro.resenas && centro.resenas.length > 0 && (
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                <div className="flex items-center justify-between mb-8">
+                   <h3 className="font-bold text-2xl text-gray-900">Reseñas de Clientes</h3>
+                   <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
+                      <IconStarFilled size={18} className="text-amber-500" />
+                      <span className="font-bold text-amber-700 text-lg">{centro.promedioRating}</span>
+                      <span className="text-amber-600/70 text-sm font-medium tracking-wide">({centro.resenas.length})</span>
+                   </div>
+                </div>
+                <div className="grid gap-4">
+                  {centro.resenas.map((res: any) => (
+                    <div key={res.id} className="p-6 bg-gray-50 rounded-2xl border border-gray-100 relative">
+                       <IconMessageCircle className="absolute top-4 right-4 text-gray-200" size={40} stroke={1} />
+                       <div className="flex items-center justify-between mb-4 relative z-10">
+                         <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 rounded-full overflow-hidden bg-white border border-gray-200 shadow-sm">
+                              {res.cliente?.avatar_url ? (
+                                <img src={res.cliente.avatar_url} alt={res.cliente.nombre} className="w-full h-full object-cover"/>
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center font-bold text-gray-500 bg-gray-100">{res.cliente?.nombre?.charAt(0) || "U"}</div>
+                              )}
+                           </div>
+                           <div className="flex flex-col">
+                             <span className="font-bold text-sm text-gray-900">{res.cliente?.nombre || "Usuario"}</span>
+                             <span className="text-[10px] text-gray-400 font-medium">
+                               {new Date(res.creado_en).toLocaleDateString("es-DO", { year: "numeric", month: "short", day: "numeric" })}
+                             </span>
+                           </div>
+                         </div>
+                         <div className="bg-white px-2 py-1 rounded-full border border-gray-100 shadow-sm">
+                           {renderStars(res.rating)}
+                         </div>
+                       </div>
+                       {res.comentario ? (
+                         <p className="text-gray-700 leading-relaxed text-sm relative z-10 italic">"{res.comentario}"</p>
+                       ) : (
+                         <p className="text-gray-400 leading-relaxed text-sm relative z-10 italic">Sin comentario.</p>
+                       )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Columna derecha - Reserva sticky */}

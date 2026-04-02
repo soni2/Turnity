@@ -24,35 +24,44 @@ export default async function InformacionUsuarioPage() {
     return <div>No autorizado</div>;
   }
 
+  // Obtenemos todos los campos reales del usuario
   const { data: profile, error } = await supabase
     .from("usuario")
     .select(
-      "nombre, email, telefono, avatar_url, detalles, direction, creado_en, direction, negocio(id,nombre,logo_url), turno(*)",
+      "id, nombre, email, telefono, avatar_url, detalles, direction, creado_en",
     )
     .eq("id", user?.id)
     .single();
 
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return <div className="p-8 text-center text-red-500">Error cargando su perfil: {error.message}</div>;
   }
 
-  const { data: turno, error: turnoError } = await supabase
+  // Obtenemos los turnos del usuario con los nombres de negocio y servicio para la interfaz
+  const { data: turnos } = await supabase
     .from("turno")
-    .select("*")
+    .select("*, servicio(nombre, negocio(id, nombre))")
     .eq("cliente_id", user?.id)
     .order("fecha", { ascending: false });
 
+  // Obtenemos negocios donde este usuario sea dueño (siempre y cuando el esquema negocio tenga dueno_id)
+  const { data: negocios } = await supabase
+    .from("negocio")
+    .select("id, nombre, logo_url")
+    .eq("dueno_id", user?.id);
+
   return (
     <UserData
+      userId={user.id}
       name={profile?.nombre}
       email={profile?.email}
       phone={profile?.telefono}
-      details={profile?.detalles}
+      detalles={profile?.detalles}
       registerDate={profile?.creado_en}
       profilePicture={profile?.avatar_url}
       direction={profile?.direction}
-      citas={turno || []}
-      negocio={profile?.negocio}
+      citas={turnos || []}
+      negocio={negocios || []}
     />
   );
 }

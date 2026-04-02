@@ -8,6 +8,9 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+
+const MapSelection = dynamic(() => import("@/app/business/registration/MapSelection"), { ssr: false });
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,6 +24,15 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Nuevos campos
+  const [detalles, setDetalles] = useState("");
+  const [coordenadas, setCoordenadas] = useState({ lat: 18.486058, lng: -69.931212 }); // Rep. Dom.
+  const [direccionMapa, setDireccionMapa] = useState("");
+
+  // OTP State
+  const [showOtp, setShowOtp] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+
   // Estados para foto
   const [foto, setFoto] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -30,6 +42,27 @@ export default function RegisterPage() {
       const file = e.target.files[0];
       setFoto(file);
       setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleUbicacionChange = (
+    lat: number,
+    lng: number,
+    dir: string,
+    addressContext?: { city?: string; town?: string; village?: string; country?: string }
+  ) => {
+    setCoordenadas({ lat, lng });
+
+    const city =
+      addressContext?.city || addressContext?.town || addressContext?.village;
+    const country = addressContext?.country;
+
+    if (city && country) {
+      setDireccionMapa(`${city}, ${country}`);
+    } else if (city || country) {
+      setDireccionMapa(city || country || dir);
+    } else {
+      setDireccionMapa(dir); // Fallback por si acaso
     }
   };
 
@@ -74,7 +107,7 @@ export default function RegisterPage() {
 
     // 2. Insertar en la tabla pública `usuario` (si existe)
     if (data.user) {
-      let foto_url = null;
+      let avatar_url = null;
 
       // Subir foto si existe
       if (foto) {
@@ -89,7 +122,7 @@ export default function RegisterPage() {
           const { data: publicUrlData } = supabase.storage
             .from("avatares")
             .getPublicUrl(uploadData.path);
-          foto_url = publicUrlData.publicUrl;
+          avatar_url = publicUrlData.publicUrl;
         }
       }
 
@@ -98,15 +131,39 @@ export default function RegisterPage() {
         nombre,
         email,
         telefono,
-        ...(foto_url && { foto_url }),
+        detalles, // <-- Renombrado según esquema
+        direction: direccionMapa, // <-- Renombrado
+        ...(avatar_url && { avatar_url }), // <-- Renombrado
       });
     }
 
     setLoading(false);
 
-    // Si Supabase requiere confirmación de correo, mostrar aviso
+    // Si Supabase requiere confirmación de correo
     if (data.session === null) {
       setSuccess(true);
+      setShowOtp(true);
+    } else {
+      router.push("/explore");
+      router.refresh();
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      email,
+      token: otpCode,
+      type: "signup"
+    });
+
+    if (otpError) {
+      setError("Código incorrecto, expirado o ya utilizado.");
+      setLoading(false);
     } else {
       router.push("/explore");
       router.refresh();
@@ -115,23 +172,50 @@ export default function RegisterPage() {
 
   const handleGoogle = () => auth.loginWithGoogle();
 
-  // ── Pantalla de "revisa tu correo" ─────────────────────────
-  if (success) {
+  // ── Pantalla de "revisa tu correo / ingresa código" ─────────────────────────
+  if (showOtp) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-10 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-16 h-16 bg-[var(--primary)] bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-5">
+            <svg className="h-8 w-8 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Revisa tu correo!</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Verifica tu correo</h2>
           <p className="text-gray-500 text-sm mb-6">
-            Te enviamos un enlace de confirmación a <strong>{email}</strong>. Haz clic en él para activar tu cuenta.
+            Hemos enviado un código de confirmación a <strong>{email}</strong>. Ingrésalo a continuación para activar tu cuenta.
           </p>
-          <Link href="/login" className="inline-block px-6 py-3 bg-[var(--primary)] text-white rounded-xl font-semibold hover:opacity-90">
-            Ir al inicio de sesión
-          </Link>
+
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <Input
+              label="Código de 6 dígitos"
+              type="text"
+              placeholder="123456"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value)}
+              required
+              maxLength={6}
+            />
+
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-center">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || otpCode.length < 6}
+              className="w-full bg-[var(--primary)] text-white py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+            >
+              {loading ? "Verificando..." : "Confirmar código"}
+            </button>
+          </form>
+
+          <p className="mt-4 text-xs text-gray-400">
+            Asegúrate de revisar tu carpeta de spam. O si presionas el enlace del correo irás directamente a la plataforma.
+          </p>
         </div>
       </div>
     );
@@ -215,6 +299,41 @@ export default function RegisterPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Biografía (opcional)
+              </label>
+              <textarea
+                value={detalles}
+                onChange={(e) => setDetalles(e.target.value)}
+                placeholder="Cuéntanos un poco sobre ti..."
+                rows={2}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-[var(--primary)] transition-colors"
+                style={{ resize: "none" }}
+              />
+            </div>
+
+            {/* Mapa de Ubicación */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                ¿De dónde nos visitas? (opcional)
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Solo guardaremos tu ciudad y país para brindarte una mejor experiencia al explorar establecimientos.
+              </p>
+              <div className="h-[200px] w-full rounded-xl overflow-hidden border border-gray-200 mb-2">
+                <MapSelection
+                  onUbicacionChange={handleUbicacionChange}
+                  ubicacionInicial={coordenadas}
+                />
+              </div>
+              {direccionMapa && (
+                <p className="text-xs text-[var(--primary)] font-medium truncate mt-1">
+                  Ubicación a guardar: {direccionMapa}
+                </p>
+              )}
+            </div>
 
             {/* Error */}
             {error && (

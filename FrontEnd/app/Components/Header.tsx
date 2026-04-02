@@ -113,6 +113,9 @@ export default function Header({ variant = "home" }: HeaderProps) {
   const [notifOpen,      setNotifOpen]      = useState(false);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [unreadCount,    setUnreadCount]    = useState(0);
+  
+  // Custom Toast State
+  const [liveToast, setLiveToast] = useState<{ title: string; message: string; visible: boolean } | null>(null);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef  = useRef<HTMLDivElement>(null);
@@ -200,12 +203,38 @@ export default function Header({ variant = "home" }: HeaderProps) {
     fetchNotificaciones();
     if (!user) return;
 
+    // Escuchar toda la tabla de turnos en este canal. 
+    // NOTA PARA EL USUARIO: Supabase requiere activar "Replication" (Realtime) 
+    // manualmente en la tabla 'turno' desde el panel de Supabase.
     const channel = supabase
-      .channel(`notif-${user.id}`)
-      .on("postgres_changes", {
-        event: "*", schema: "public", table: "turno",
-        filter: `cliente_id=eq.${user.id}`,
-      }, () => fetchNotificaciones())
+      .channel(`realtime-turnos-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "turno", filter: `cliente_id=eq.${user.id}` },
+        (payload) => {
+          // Recargar lista
+          fetchNotificaciones();
+
+          // Activar Live Toast personalizado
+          if (payload.eventType === "INSERT") {
+            setLiveToast({ title: "¡Nueva Cita!", message: "Se ha agregado una cita a tu calendario.", visible: true });
+          } else if (payload.eventType === "UPDATE") {
+            const newState = payload.new.estado;
+            if (newState === "cancelado") {
+              setLiveToast({ title: "Cita Cancelada", message: "Una de tus citas ha sido cancelada.", visible: true });
+            } else if (newState === "confirmado") {
+              setLiveToast({ title: "Cita Confirmada", message: "Tu cita ha sido confirmada.", visible: true });
+            } else {
+              setLiveToast({ title: "Actualización de Cita", message: "Han habido cambios en tu agenda.", visible: true });
+            }
+          }
+
+          // Esconder el Toast después de 4 segundos
+          setTimeout(() => {
+            setLiveToast((prev) => (prev ? { ...prev, visible: false } : null));
+          }, 4500);
+        }
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -295,6 +324,7 @@ export default function Header({ variant = "home" }: HeaderProps) {
   /* ── Variante APP ── */
   if (!isHome) {
     return (
+    <>
       <nav className="w-full fixed top-0 z-50 bg-[var(--primary)] shadow-md">
         <div className="md:max-w-[1200px] mx-auto px-4 h-16 flex items-center gap-4">
 
@@ -468,6 +498,32 @@ export default function Header({ variant = "home" }: HeaderProps) {
 
         </div>
       </nav>
+
+      {/* ── CUSTOM LIVE TOAST ── */}
+      {liveToast && (
+        <div 
+          className={`fixed bottom-6 right-6 z-[9999] max-w-sm w-full bg-white rounded-xl shadow-2xl border-l-4 border-[var(--primary)] p-4 transform transition-all duration-500 ease-out ${
+            liveToast.visible ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center mt-0.5">
+              <IconBell size={18} className="text-[var(--primary)]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-gray-900 leading-tight mb-1">{liveToast.title}</p>
+              <p className="text-xs text-gray-600 leading-snug">{liveToast.message}</p>
+            </div>
+            <button 
+              onClick={() => setLiveToast({ ...liveToast, visible: false })}
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+            >
+              <IconX size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
     );
   }
 
