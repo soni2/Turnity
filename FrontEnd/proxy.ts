@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -31,29 +31,35 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const url = request.nextUrl.clone();
-  
+
   // Define public routes that don't require authentication
-  const isPublicRoute = 
-    url.pathname === '/' ||
-    url.pathname.startsWith('/login') ||
-    url.pathname.startsWith('/register') ||
-    url.pathname.startsWith('/explore') ||
-    url.pathname.startsWith('/business') ||
-    url.pathname.startsWith('/api') ||
-    url.pathname.startsWith('/_next') ||
-    url.pathname.includes('.'); // Allow public files (images, favicon, etc.)
+  const isPublicRoute =
+    url.pathname === "/" ||
+    url.pathname.startsWith("/login") ||
+    url.pathname.startsWith("/register") ||
+    url.pathname.startsWith("/reset-password") ||
+    url.pathname.startsWith("/explore") ||
+    url.pathname.startsWith("/business") ||
+    url.pathname.startsWith("/api") ||
+    url.pathname.startsWith("/_next") ||
+    url.pathname.includes("."); // Allow public files (images, favicon, etc.)
 
   if (!user && !isPublicRoute) {
-    url.pathname = '/login';
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
   // Redirect authenticated users away from login/register to /explore
-  if (user && (url.pathname.startsWith('/login') || url.pathname.startsWith('/register'))) {
-    url.pathname = '/explore';
+  if (
+    user &&
+    (url.pathname.startsWith("/login") || url.pathname.startsWith("/register"))
+  ) {
+    url.pathname = "/explore";
     return NextResponse.redirect(url);
   }
 
