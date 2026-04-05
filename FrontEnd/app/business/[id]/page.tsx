@@ -716,54 +716,61 @@ export default function CentroPage() {
             {/* Servicios */}
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
               <h3 className="font-bold text-2xl mb-6">Nuestros Servicios</h3>
-              <div className="space-y-4">
-                {centro.servicios.map((servicio: any) => (
-                  <div
-                    key={servicio.id}
-                    className={`border rounded-2xl p-5 cursor-pointer transition-all duration-200 shadow-sm ${
-                      selectedService === servicio.id
-                        ? "border-[var(--primary)] ring-4 ring-[var(--primary)]/10 bg-purple-50 hover:bg-purple-50 shadow-purple-900/5 transform scale-[1.01]"
-                        : "border-gray-200 hover:border-[var(--primary)]/40 hover:bg-gray-50 hover:shadow-md"
-                    } ${!servicio.disponible ? "opacity-50 grayscale select-none" : ""}`}
-                    onClick={() =>
-                      servicio.disponible && setSelectedService(servicio.id)
-                    }
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-bold text-lg text-gray-900">
-                          {servicio.nombre}
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-1 max-w-sm">
-                          {servicio.descripcion}
-                        </p>
-                        <div className="flex items-center mt-3 space-x-3">
-                          <span className="text-xs font-semibold px-2 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-md flex flex-row items-center gap-2">
-                            <IconClock size={20} />
-                            {servicio.duracion}
+              {centro.servicios && centro.servicios.length > 0 ? (
+                <div className="space-y-4">
+                  {centro.servicios.map((servicio: any) => (
+                    <div
+                      key={servicio.id}
+                      className={`border rounded-2xl p-5 cursor-pointer transition-all duration-200 shadow-sm ${
+                        selectedService === servicio.id
+                          ? "border-[var(--primary)] ring-4 ring-[var(--primary)]/10 bg-purple-50 hover:bg-purple-50 shadow-purple-900/5 transform scale-[1.01]"
+                          : "border-gray-200 hover:border-[var(--primary)]/40 hover:bg-gray-50 hover:shadow-md"
+                      } ${!servicio.disponible ? "opacity-50 grayscale select-none" : ""}`}
+                      onClick={() =>
+                        servicio.disponible && setSelectedService(servicio.id)
+                      }
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-bold text-lg text-gray-900">
+                            {servicio.nombre}
+                          </h4>
+                          <p className="text-sm text-gray-600 mt-1 max-w-sm">
+                            {servicio.descripcion}
+                          </p>
+                          <div className="flex items-center mt-3 space-x-3">
+                            <span className="text-xs font-semibold px-2 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-md flex flex-row items-center gap-2">
+                              <IconClock size={20} />
+                              {servicio.duracion}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right flex flex-col items-end">
+                          <span className="font-bold text-xl text-[var(--primary)]">
+                            RD${servicio.precio}
                           </span>
+                          {!servicio.disponible && (
+                            <span className="text-[10px] font-bold text-red-600 mt-2 px-2 py-1 bg-red-50 border border-red-100 rounded-md uppercase tracking-wide">
+                              No disponible
+                            </span>
+                          )}
+                          {selectedService === servicio.id && (
+                            <span className="mt-3 text-xs font-bold text-purple-700 flex items-center gap-1 bg-purple-100 px-2 py-1 rounded-md">
+                              <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />{" "}
+                              Seleccionado
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right flex flex-col items-end">
-                        <span className="font-bold text-xl text-[var(--primary)]">
-                          RD${servicio.precio}
-                        </span>
-                        {!servicio.disponible && (
-                          <span className="text-[10px] font-bold text-red-600 mt-2 px-2 py-1 bg-red-50 border border-red-100 rounded-md uppercase tracking-wide">
-                            No disponible
-                          </span>
-                        )}
-                        {selectedService === servicio.id && (
-                          <span className="mt-3 text-xs font-bold text-purple-700 flex items-center gap-1 bg-purple-100 px-2 py-1 rounded-md">
-                            <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />{" "}
-                            Seleccionado
-                          </span>
-                        )}
-                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-8 bg-gray-50 border border-gray-100 rounded-2xl text-gray-500">
+                  <span className="font-medium text-lg">Sin servicios</span>
+                  <p className="text-sm mt-1">Este negocio aún no ha añadido servicios a su catálogo.</p>
+                </div>
+              )}
             </div>
 
             {/* Horarios Detallados */}
@@ -774,50 +781,57 @@ export default function CentroPage() {
             {/* Profesionales */}
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
               <h3 className="font-bold text-2xl mb-6">Nuestros Estilistas</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {centro.profesionales.map((pro: any) => (
-                  <div
-                    key={pro.id}
-                    className="flex items-center p-4 bg-gray-50 border border-gray-100 rounded-2xl hover:shadow-md transition-shadow"
-                  >
-                    <div className="w-14 h-14 rounded-full mr-4 overflow-hidden border-2 border-white shadow-sm shrink-0">
-                      {pro.foto_url ? (
-                        <Image
-                          src={pro.foto_url}
-                          alt={pro.nombre}
-                          width={56}
-                          height={56}
-                          className="object-cover w-full h-full"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xl font-bold">
-                          {pro.nombre.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900">{pro.nombre}</h4>
-                      <p className="text-xs text-gray-500 font-medium">
-                        {pro.especialidad}
-                      </p>
-                      {pro.ratingStr !== "Nuevo" && (
-                        <div className="flex items-center gap-1 mt-1 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 self-start">
-                          <IconStarFilled
-                            size={10}
-                            className="text-amber-500"
+              {centro.profesionales && centro.profesionales.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {centro.profesionales.map((pro: any) => (
+                    <div
+                      key={pro.id}
+                      className="flex items-center p-4 bg-gray-50 border border-gray-100 rounded-2xl hover:shadow-md transition-shadow"
+                    >
+                      <div className="w-14 h-14 rounded-full mr-4 overflow-hidden border-2 border-white shadow-sm shrink-0">
+                        {pro.foto_url ? (
+                          <Image
+                            src={pro.foto_url}
+                            alt={pro.nombre}
+                            width={56}
+                            height={56}
+                            className="object-cover w-full h-full"
                           />
-                          <span className="text-[10px] font-bold text-amber-700">
-                            {pro.ratingStr}
-                          </span>
-                          <span className="text-[9px] text-amber-600/70">
-                            ({pro.ratingCount})
-                          </span>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xl font-bold">
+                            {pro.nombre.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900">{pro.nombre}</h4>
+                        <p className="text-xs text-gray-500 font-medium">
+                          {pro.especialidad}
+                        </p>
+                        {pro.ratingStr !== "Nuevo" && (
+                          <div className="flex items-center gap-1 mt-1 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 self-start">
+                            <IconStarFilled
+                              size={10}
+                              className="text-amber-500"
+                            />
+                            <span className="text-[10px] font-bold text-amber-700">
+                              {pro.ratingStr}
+                            </span>
+                            <span className="text-[9px] text-amber-600/70">
+                              ({pro.ratingCount})
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-8 bg-gray-50 border border-gray-100 rounded-2xl text-gray-500">
+                  <span className="font-medium text-lg">Aún sin equipo</span>
+                  <p className="text-sm mt-1">Este negocio todavía no cuenta con profesionales disponibles.</p>
+                </div>
+              )}
             </div>
 
             {/* Reseñas (Reviews tomadas desde DB) */}
@@ -923,7 +937,11 @@ export default function CentroPage() {
                 )}
 
                 {/* Selector de Profesional */}
-                {selectedService && (
+                {selectedService && (!centro.profesionales || centro.profesionales.length === 0) ? (
+                  <div className="mb-6 p-4 rounded-xl border border-red-100 bg-red-50 text-red-600 text-sm font-medium text-center">
+                    Este negocio no tiene personal registrado. No es posible agendar citas en este momento.
+                  </div>
+                ) : selectedService && (
                   <div className="mb-6 animate-fade-in">
                     <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">
