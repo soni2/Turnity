@@ -44,11 +44,22 @@ function LoginContent() {
     }
   };
 
+    const isPasswordValid = (pw: string) => {
+    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(pw);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setLoading(true);
     setError(null);
     setSuccessMsg(null);
+
+    if (!isPasswordValid(password)) {
+      setError("La contraseña no cumple con los parámetros (mínimo 6 caracteres, 1 mayúscula, 1 minúscula y 1 número).");
+      setLoading(false);
+      return;
+    }
 
     try {
       await auth.loginWithEmail(email, password);

@@ -34,7 +34,11 @@ export default async function InformacionUsuarioPage() {
     .single();
 
   if (error) {
-    return <div className="p-8 text-center text-red-500">Error cargando su perfil: {error.message}</div>;
+    return (
+      <div className="p-8 text-center text-red-500">
+        Error cargando su perfil: {error.message}
+      </div>
+    );
   }
 
   // Obtenemos los turnos del usuario con los nombres de negocio y servicio para la interfaz

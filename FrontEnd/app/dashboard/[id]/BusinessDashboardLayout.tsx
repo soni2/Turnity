@@ -19,6 +19,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Header from "@/app/Components/Header";
 import StatsCard from "../components/StatsCard";
+import PDFDownloadButton from "../components/PDFDownloadButton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type NegocioDetalle = {
@@ -471,7 +472,12 @@ export default function BusinessDashboardLayout({
                 {/* Citas rápido */}
                 <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
-                    <h3 className="text-xl font-bold text-gray-900">Gestión de Citas</h3>
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-xl font-bold text-gray-900">Gestión de Citas</h3>
+                      {!dataLoading && turnos.length > 0 && (
+                        <PDFDownloadButton turnos={turnos} negocioNombre={negocio.nombre} />
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center bg-gray-100 rounded-lg p-1">
                         <button

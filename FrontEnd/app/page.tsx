@@ -11,9 +11,12 @@ import Faqs from "./Components/Faqs";
 import Header from "./Components/Header";
 import Footer from "./Components/Footer";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { IconX } from "@tabler/icons-react";
 
 export default function Home() {
   const router = useRouter();
+  const [showModal, setShowModal] = useState(false);
 
   const testimonios = [
     {
@@ -95,6 +98,7 @@ export default function Home() {
         description="Reserva tu lugar con solo unos toques y recibe confirmación instantánea de tu estilista."
         button={true}
         buttonText="Explora más funciones"
+        onButtonClick={() => setShowModal(true)}
       >
         {mainFunctions.map((funcion, index) => (
           <Card
@@ -179,6 +183,48 @@ export default function Home() {
         </Buttons>
       </Section>
       <Footer />
+
+      {/* Modal Extra Features */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <button 
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors"
+            >
+               <IconX size={24} />
+            </button>
+            <h2 className="text-3xl font-extrabold text-[var(--primary)] mb-6 text-center md:text-left">Todo lo que necesitas, en Turnity</h2>
+            <div className="grid md:grid-cols-2 gap-6 text-left">
+               <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100/50 shadow-sm">
+                 <h3 className="font-bold text-gray-900 mb-2 whitespace-nowrap">🔔 Notificaciones en tiempo real</h3>
+                 <p className="text-sm text-gray-600 leading-relaxed">Recibe alertas instantáneas y recordatorios en tu cuenta y calendario cuando modifiquen tu cita.</p>
+               </div>
+               <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100/50 shadow-sm">
+                 <h3 className="font-bold text-gray-900 mb-2 whitespace-nowrap">✂️ Múltiples estilistas</h3>
+                 <p className="text-sm text-gray-600 leading-relaxed">Un mismo negocio puede organizar múltiples barberos/estilistas y agendar sus horarios de forma independiente.</p>
+               </div>
+               <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100/50 shadow-sm">
+                 <h3 className="font-bold text-gray-900 mb-2 whitespace-nowrap">⭐ Reseñas y reputación</h3>
+                 <p className="text-sm text-gray-600 leading-relaxed">Asegura tu visita leyendo valoraciones verificadas de otros clientes sobre sus experiencias en la tienda.</p>
+               </div>
+               <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100/50 shadow-sm">
+                 <h3 className="font-bold text-gray-900 mb-2 whitespace-nowrap">📊 Panel administrativo</h3>
+                 <p className="text-sm text-gray-600 leading-relaxed">Si administras un negocio, obtienes un dashboard potente para gestionar finanzas y empleados.</p>
+               </div>
+            </div>
+            
+            <div className="mt-8 text-center border-t border-gray-100 pt-6">
+              <button 
+                onClick={() => {setShowModal(false); handleRouter("/explore");}}
+                className="bg-[var(--primary)] text-white px-8 py-3 rounded-xl font-bold hover:brightness-110 transition-all shadow-lg w-full md:w-auto"
+              >
+                Empezar a explorar ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

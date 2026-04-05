@@ -9,16 +9,9 @@ export default function Hero() {
   return (
     <div className="min-h-vh mt-12 bg-white">
       <div className="container max-w-7xl mx-auto px-4 pb-16 ">
-        <div
-          className="flex items-center gap-16 min-h-[800px] grid grid-cols-5"
-          style={{
-            backgroundImage: "url(/hero1.png)",
-            backgroundSize: "contain",
-            backgroundPosition: "right center",
-            backgroundRepeat: "no-repeat",
-          }}
-        >
-          <div className="flex-1 col-span-full space-y-8 md:col-span-2">
+        <div className="items-center gap-8 md:gap-16 min-h-[600px] md:min-h-[800px] grid grid-cols-1 md:grid-cols-5">
+          {/* Contenido de Texto */}
+          <div className="col-span-1 md:col-span-2 space-y-8 flex flex-col justify-center">
             {/* <Logo className="h-20" /> */}
             <Titles className="text-left">Define tu estilo</Titles>
 
@@ -32,6 +25,15 @@ export default function Hero() {
             <Buttons onClick={() => handleRouter("/explore")}>
               Explorar negocios
             </Buttons>
+          </div>
+
+          {/* Imagen ilustrativa en la parte derecha */}
+          <div className="hidden md:flex col-span-3 items-center justify-end h-full w-full">
+            <img 
+              src="/hero1.png" 
+              alt="Plataforma para salones y barberías" 
+              className="object-contain object-right w-full h-full max-h-[800px]"
+            />
           </div>
         </div>
       </div>

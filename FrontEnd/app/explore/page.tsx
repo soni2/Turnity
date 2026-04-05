@@ -12,16 +12,15 @@ import MobileNav from "../Components/MobileNav";
 
 function ExploreContent() {
   const searchParams = useSearchParams();
-  const [busqueda, setBusqueda] = useState(searchParams.get("q") ?? "");
+  const searchParam = searchParams.get("search") ?? "";
   const [categoriaActiva, setCategoriaActiva] = useState("Todas");
-
-  const [rangoPrecio, setRangoPrecio] = useState([0, 5000]);
   const [ordenarPor, setOrdenarPor] = useState("recomendados");
   const [showFilters, setShowFilters] = useState(false);
   const [servicios, setServicios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const categorias = [
+    "Todas",
     "Barbería",
     "Salón de belleza",
     "Centro de uñas",
@@ -32,88 +31,53 @@ function ExploreContent() {
     "Otro",
   ];
 
-  // Sync search input with URL param when header updates it
-  useEffect(() => {
-    const q = searchParams.get("q") ?? "";
-    setBusqueda(q);
-  }, [searchParams]);
-
   useEffect(() => {
     async function fetchNegocios() {
-      const supabase = createClient();
-      const { data, error } = await supabase.from("negocio").select(`
-          id,
-          nombre,
-          descripcion,
-          ciudad,
-          categoria,
-          logo_url,
-          fotos
-        `);
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (searchParam) params.append("search", searchParam);
+        if (categoriaActiva !== "Todas") params.append("categoria", categoriaActiva);
 
-      if (error) {
-        console.error("Error fetching negocios:", error);
-      } else {
-        // Mapear los datos al formato que espera el componente
-        const formattedData = data.map((n) => ({
-          id: n.id,
-          title: n.nombre,
-          description: n.descripcion || "Sin descripción disponible",
-          rating: 5, // Placeholder ya que no hay rating en la tabla todavía
-          precio: 0, // Placeholder
-          categoria: n.categoria || "Barbería", // Usar la categoría real o un default
-          logo_url: n.logo_url || "/no-picture.webp",
-          fotos: n.fotos || ["/no-picture.webp"],
-        }));
+        const res = await fetch(`/api/explore?${params.toString()}`);
+        if (!res.ok) throw new Error("Error obteniendo resultados");
+        const json = await res.json();
+        const formattedData = json.data || [];
+
+        // Sorting
+        if (ordenarPor === "mejor-valorados") {
+          formattedData.sort((a: any, b: any) => {
+            const valA = a.rating === "Nuevo" ? 0 : Number(a.rating);
+            const valB = b.rating === "Nuevo" ? 0 : Number(b.rating);
+            return valB - valA;
+          });
+        }
+        
         setServicios(formattedData);
+      } catch (err) {
+        console.error("Error fetching api:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
 
     fetchNegocios();
-  }, []);
+  }, [searchParam, categoriaActiva, ordenarPor]);
 
   const renderStars = (rating: number) => {
     return (
-      <div className="flex">
+      <div className="flex gap-0.5">
         {[1, 2, 3, 4, 5].map((star) => (
           <span
             key={star}
-            className={star <= rating ? "text-yellow-400" : "text-gray-300"}
+            className={star <= Math.round(rating) ? "text-amber-400" : "text-gray-300"}
           >
-            ★
+            <svg width="16" height="16" viewBox="0 0 24 24" fill={star <= Math.round(rating) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
           </span>
         ))}
       </div>
     );
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-xl font-semibold">Cargando negocios...</p>
-      </div>
-    );
-  }
-
-  const serviciosFiltrados = servicios.filter((servicio) => {
-    // Filtro de categoría
-    if (categoriaActiva !== "Todas" && servicio.categoria !== categoriaActiva) {
-      return false;
-    }
-    // Filtro de precio (asumiendo que los servicios tienen precio)
-    if (servicio.precio > rangoPrecio[1]) {
-      return false;
-    }
-    // Filtro de búsqueda
-    if (
-      busqueda &&
-      !servicio.title.toLowerCase().includes(busqueda.toLowerCase())
-    ) {
-      return false;
-    }
-    return true;
-  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -148,20 +112,48 @@ function ExploreContent() {
           <div className={`${showFilters ? "block" : "hidden"} lg:block`}>
             <SideBar
               categorias={categorias}
-              rangoPrecio={rangoPrecio}
-              setRangoPrecio={setRangoPrecio}
               categoriaActiva={categoriaActiva}
               setCategoriaActiva={setCategoriaActiva}
             />
           </div>
-          <Main
-            ordenarPor={ordenarPor}
-            servicios={serviciosFiltrados}
-            setOrdenarPor={setOrdenarPor}
-            renderStars={renderStars}
-            busqueda={busqueda}
-            setBusqueda={setBusqueda}
-          />
+          
+          {loading ? (
+             <main className="flex-1">
+               <div className="flex justify-between items-center mb-6">
+                 <div className="h-4 bg-gray-200 rounded w-1/4 animate-pulse"></div>
+                 <div className="h-8 bg-gray-200 rounded w-32 animate-pulse"></div>
+               </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                 {[1, 2, 3, 4, 5, 6].map(i => (
+                   <div key={i} className="bg-white rounded-lg shadow-sm p-6 flex flex-col h-full animate-pulse border border-gray-100">
+                     <div className="w-full h-52 bg-gray-200 rounded-xl mb-4"></div>
+                     <div className="flex items-center gap-3 mb-4">
+                       <div className="w-10 h-10 bg-gray-200 rounded-xl shrink-0"></div>
+                       <div className="h-5 bg-gray-200 rounded w-2/3"></div>
+                     </div>
+                     <div className="space-y-2 mb-6">
+                        <div className="h-3 bg-gray-200 rounded w-full"></div>
+                        <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                        <div className="h-3 bg-gray-200 rounded w-4/6"></div>
+                     </div>
+                     <div className="mt-auto flex flex-col gap-3">
+                        <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                        <div className="h-10 bg-[var(--primary)]/20 rounded-lg w-full"></div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             </main>
+          ) : (
+             <Main
+               ordenarPor={ordenarPor}
+               servicios={servicios} // Filtrado ocurre en bdd
+               setOrdenarPor={setOrdenarPor}
+               renderStars={renderStars}
+               busqueda={searchParam}
+               setBusqueda={() => {}}
+             />
+          )}
         </div>
       </div>
 

@@ -9,14 +9,30 @@ export default function UpdatePasswordPage() {
   const router = useRouter();
   const supabase = createClient();
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const isPasswordValid = (pw: string) => {
+    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(pw);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+
+    if (!isPasswordValid(password)) {
+      setError("La contraseña debe tener al menos 6 caracteres, una mayúscula, una minúscula y un número.");
+      return;
+    }
+
+    setLoading(true);
 
     const { error } = await supabase.auth.updateUser({
       password: password
@@ -59,11 +75,18 @@ export default function UpdatePasswordPage() {
             <Input
               label="Nueva contraseña"
               type="password"
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Contraseña segura"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+            />
+            <Input
+              label="Repetir nueva contraseña"
+              type="password"
+              placeholder="Vuelve a escribirla"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
             />
 
             {error && (

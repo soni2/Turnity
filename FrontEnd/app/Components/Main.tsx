@@ -9,8 +9,8 @@ type Servicios = {
   id: string;
   title: string;
   description: string;
-  rating: number;
-  precio: number;
+  rating: number | string;
+  resenaCount: number;
   categoria: string;
   logo_url: string;
   fotos: string[];
@@ -61,8 +61,6 @@ export default function Main({
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
         >
           <option value="recomendados">Recomendados</option>
-          <option value="precio-menor">Precio: menor a mayor</option>
-          <option value="precio-mayor">Precio: mayor a menor</option>
           <option value="mejor-valorados">Mejor valorados</option>
         </select>
       </div>
@@ -105,12 +103,20 @@ export default function Main({
               <div className="mt-auto flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    {renderStars(servicio.rating)}
-                    <span className="text-sm text-gray-500 font-medium">
-                      ({servicio.rating}.0)
-                    </span>
+                    {servicio.rating === "Nuevo" ? (
+                       <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 uppercase tracking-wide">Nuevo</span>
+                    ) : (
+                       <>
+                         {renderStars(Number(servicio.rating))}
+                         <span className="text-sm font-bold text-amber-700">
+                           {servicio.rating}
+                         </span>
+                         <span className="text-xs font-semibold text-amber-600/60">
+                           ({servicio.resenaCount})
+                         </span>
+                       </>
+                    )}
                   </div>
-                  {/* <span className="font-medium text-black">${servicio.precio}</span> */}
                 </div>
                 <button
                   onClick={() => handleRouter(`/business/${servicio.id}`)}

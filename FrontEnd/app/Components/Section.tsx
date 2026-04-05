@@ -10,6 +10,7 @@ type SectionProps = {
   background?: string;
   gridMd?: string;
   gap?: string;
+  onButtonClick?: () => void;
 };
 
 export default function Section({
@@ -21,6 +22,7 @@ export default function Section({
   background,
   gridMd,
   gap,
+  onButtonClick,
 }: SectionProps) {
   return (
     <div
@@ -44,7 +46,7 @@ export default function Section({
         <div className="text-center mt-20">
           {button ? (
             <div className="flex justify-center w-full">
-              <Buttons> {buttonText} </Buttons>
+              <Buttons onClick={onButtonClick}> {buttonText} </Buttons>
             </div>
           ) : null}
         </div>

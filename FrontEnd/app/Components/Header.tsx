@@ -53,7 +53,7 @@ function formatNotifFecha(fecha: string): string {
   });
 }
 
-function buildNotifs(turnos: any[], servicioMap: Record<string, string>): Notificacion[] {
+function buildNotifs(turnos: any[], servicioMap: Record<string, string>, currentUserId: string): Notificacion[] {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   const notifs: Notificacion[] = [];
@@ -64,34 +64,35 @@ function buildNotifs(turnos: any[], servicioMap: Record<string, string>): Notifi
     const isUpcoming  = t.fecha >  todayStr;
     const isCanceled  = t.estado === "cancelado";
     const isConfirmed = t.estado === "confirmado";
+    const isOwner     = t.cliente_id !== currentUserId; // Si no es el cliente, la estamos recibiendo como dueños/empleados
 
     if (isCanceled) {
       notifs.push({
         id: `cancel-${t.id}`, tipo: "cancelada",
-        titulo: "Cita cancelada",
-        descripcion: `Tu cita de ${nombreServicio} fue cancelada.`,
+        titulo: isOwner ? "Cancelación" : "Cita cancelada",
+        descripcion: isOwner ? `Un cliente canceló ${nombreServicio}.` : `Tu cita de ${nombreServicio} fue cancelada.`,
         fecha: t.fecha, hora: t.hora_inicio, leida: false, turnoId: t.id,
       });
     } else if (isToday) {
       notifs.push({
         id: `hoy-${t.id}`, tipo: "hoy",
-        titulo: "¡Cita hoy!",
-        descripcion: `Tienes ${nombreServicio} hoy a las ${t.hora_inicio}.`,
+        titulo: isOwner ? "Turno pendiente hoy" : "¡Cita hoy!",
+        descripcion: isOwner ? `Tienes agendado ${nombreServicio} hoy a las ${t.hora_inicio}.` : `Tienes ${nombreServicio} hoy a las ${t.hora_inicio}.`,
         fecha: t.fecha, hora: t.hora_inicio, leida: false, turnoId: t.id,
       });
     } else if (isUpcoming && isConfirmed) {
       notifs.push({
         id: `conf-${t.id}`, tipo: "confirmada",
-        titulo: "Cita confirmada",
-        descripcion: `${nombreServicio} confirmada para el ${formatNotifFecha(t.fecha)} a las ${t.hora_inicio}.`,
+        titulo: isOwner ? "Reserva aprobada" : "Cita confirmada",
+        descripcion: isOwner ? `${nombreServicio} en la agenda el ${formatNotifFecha(t.fecha)} a las ${t.hora_inicio}.` : `${nombreServicio} confirmada para el ${formatNotifFecha(t.fecha)} a las ${t.hora_inicio}.`,
         fecha: t.fecha, hora: t.hora_inicio, leida: false, turnoId: t.id,
       });
     } else if (isUpcoming) {
-      // pending (any age) → "próxima cita"
+      // pending (any age) → "próxima cita" o "nueva reserva a revisar"
       notifs.push({
         id: `prox-${t.id}`, tipo: "proxima",
-        titulo: "Próxima cita",
-        descripcion: `${nombreServicio} el ${formatNotifFecha(t.fecha)} a las ${t.hora_inicio}.`,
+        titulo: isOwner ? "NUEVA RESERVA" : "Próxima cita",
+        descripcion: isOwner ? `Solicitud de ${nombreServicio} el ${formatNotifFecha(t.fecha)} (${t.hora_inicio}).` : `${nombreServicio} el ${formatNotifFecha(t.fecha)} a las ${t.hora_inicio}.`,
         fecha: t.fecha, hora: t.hora_inicio, leida: false, turnoId: t.id,
       });
     }
@@ -163,10 +164,20 @@ export default function Header({ variant = "home" }: HeaderProps) {
     const past30  = new Date(today); past30.setDate(today.getDate() - 30);
     const in60    = new Date(today); in60.setDate(today.getDate() + 60);
 
+    const { data: misEmpleados } = await supabase
+      .from("empleado")
+      .select("id")
+      .eq("usuario_id", user.id);
+    const empIds = misEmpleados?.map(e => e.id) || [];
+    let queryFilter = `cliente_id.eq.${user.id}`;
+    if (empIds.length > 0) {
+      queryFilter = `cliente_id.eq.${user.id},empleado_id.in.(${empIds.join(",")})`;
+    }
+
     const { data: turnos, error } = await supabase
       .from("turno")
-      .select("id, fecha, hora_inicio, estado, servicio_id")
-      .eq("cliente_id", user.id)
+      .select("id, fecha, hora_inicio, estado, servicio_id, cliente_id")
+      .or(queryFilter)
       .gte("fecha", past30.toISOString().split("T")[0])
       .lte("fecha", in60.toISOString().split("T")[0])
       .order("fecha", { ascending: false });
@@ -182,7 +193,7 @@ export default function Header({ variant = "home" }: HeaderProps) {
     const servicioMap: Record<string, string> = {};
     (servicios ?? []).forEach((s: any) => { servicioMap[s.id] = s.nombre; });
 
-    const notifs = buildNotifs(turnos, servicioMap);
+    const notifs = buildNotifs(turnos, servicioMap, user.id);
 
     // Restore read state from localStorage
     const storageKey = `notif-read-${user.id}`;
@@ -203,41 +214,83 @@ export default function Header({ variant = "home" }: HeaderProps) {
     fetchNotificaciones();
     if (!user) return;
 
-    // Escuchar toda la tabla de turnos en este canal. 
-    // NOTA PARA EL USUARIO: Supabase requiere activar "Replication" (Realtime) 
-    // manualmente en la tabla 'turno' desde el panel de Supabase.
-    const channel = supabase
-      .channel(`realtime-turnos-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "turno", filter: `cliente_id=eq.${user.id}` },
-        (payload) => {
-          // Recargar lista
-          fetchNotificaciones();
+    const handlePayload = (payload: any) => {
+      // Recargar lista
+      fetchNotificaciones();
 
-          // Activar Live Toast personalizado
-          if (payload.eventType === "INSERT") {
-            setLiveToast({ title: "¡Nueva Cita!", message: "Se ha agregado una cita a tu calendario.", visible: true });
-          } else if (payload.eventType === "UPDATE") {
-            const newState = payload.new.estado;
-            if (newState === "cancelado") {
-              setLiveToast({ title: "Cita Cancelada", message: "Una de tus citas ha sido cancelada.", visible: true });
-            } else if (newState === "confirmado") {
-              setLiveToast({ title: "Cita Confirmada", message: "Tu cita ha sido confirmada.", visible: true });
-            } else {
-              setLiveToast({ title: "Actualización de Cita", message: "Han habido cambios en tu agenda.", visible: true });
-            }
-          }
+      // Preparar textos de notificacion
+      let notifTitle = "Actualización de Cita";
+      let notifMessage = "Han habido cambios en tu agenda.";
 
-          // Esconder el Toast después de 4 segundos
-          setTimeout(() => {
-            setLiveToast((prev) => (prev ? { ...prev, visible: false } : null));
-          }, 4500);
+      const isOwnerEvent = payload.new?.cliente_id !== user.id;
+
+      if (payload.eventType === "INSERT") {
+        notifTitle = isOwnerEvent ? "¡Nueva Reserva!" : "¡Nueva Cita!";
+        notifMessage = isOwnerEvent 
+          ? "Un cliente acaba de agendar un turno en tu negocio." 
+          : "Se ha agregado una cita a tu calendario.";
+      } else if (payload.eventType === "UPDATE") {
+        const newState = payload.new.estado;
+        if (newState === "cancelado") {
+          notifTitle = "Cita Cancelada";
+          notifMessage = isOwnerEvent ? "Un cliente ha cancelado su cita." : "Una de tus citas ha sido cancelada.";
+        } else if (newState === "confirmado") {
+          notifTitle = "Cita Confirmada";
+          notifMessage = isOwnerEvent ? "Turno marcado como confirmado." : "Tu cita ha sido confirmada.";
         }
-      )
-      .subscribe();
+      }
 
-    return () => { supabase.removeChannel(channel); };
+      // Activar Live Toast interno
+      setLiveToast({ title: notifTitle, message: notifMessage, visible: true });
+
+      // Lanzar Notificación Nativa a Windows/MacOS
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(`Turnity: ${notifTitle}`, {
+          body: notifMessage,
+        });
+      }
+
+      // Esconder el Toast después de 4 segundos
+      setTimeout(() => {
+        setLiveToast((prev) => (prev ? { ...prev, visible: false } : null));
+      }, 4500);
+    };
+
+    const channel = supabase.channel(`realtime-turnos-${user.id}`);
+
+    // Cliente Realtime
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "turno", filter: `cliente_id=eq.${user.id}` },
+      handlePayload
+    );
+
+    // Negocio Realtime
+    let isSubscribed = false;
+    supabase
+      .from("empleado")
+      .select("id")
+      .eq("usuario_id", user.id)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          data.forEach(emp => {
+            channel.on(
+              "postgres_changes",
+              { event: "*", schema: "public", table: "turno", filter: `empleado_id=eq.${emp.id}` },
+              handlePayload
+            );
+          });
+        }
+        if (!isSubscribed) {
+          channel.subscribe();
+          isSubscribed = true;
+        }
+      });
+
+    return () => { 
+      isSubscribed = true;
+      supabase.removeChannel(channel); 
+    };
   }, [fetchNotificaciones, user, supabase]);
 
   // ── Search ────────────────────────────────────────────────────────────────
@@ -245,7 +298,6 @@ export default function Header({ variant = "home" }: HeaderProps) {
     if (!searchQuery.trim()) {
       setDropdownResults([]);
       setShowDropdown(false);
-      if (isExplorePage) router.replace("/explore", { scroll: false });
       return;
     }
     const t = setTimeout(async () => {
@@ -257,25 +309,19 @@ export default function Header({ variant = "home" }: HeaderProps) {
         .limit(6);
 
       if (!error && data) {
-        if (isExplorePage) {
-          const p = new URLSearchParams(window.location.search);
-          p.set("q", searchQuery);
-          router.replace(`/explore?${p.toString()}`, { scroll: false });
-        } else {
-          setDropdownResults(data);
-          setShowDropdown(data.length > 0);
-        }
+        setDropdownResults(data);
+        setShowDropdown(data.length > 0);
       }
       setIsSearching(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [searchQuery, isExplorePage, supabase, router]);
+  }, [searchQuery, supabase]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchQuery.trim()) {
       setShowDropdown(false);
-      router.push(`/explore?q=${encodeURIComponent(searchQuery.trim())}`);
+      router.push(`/explore?search=${encodeURIComponent(searchQuery.trim())}`);
     }
     if (e.key === "Escape") setShowDropdown(false);
   };
@@ -284,7 +330,9 @@ export default function Header({ variant = "home" }: HeaderProps) {
     setSearchQuery("");
     setDropdownResults([]);
     setShowDropdown(false);
-    if (isExplorePage) router.replace("/explore", { scroll: false });
+    if (isExplorePage) {
+       router.push("/explore"); 
+    }
   };
 
   const markAllRead = () => {
@@ -364,7 +412,7 @@ export default function Header({ variant = "home" }: HeaderProps) {
                 </button>
               )}
 
-              {showDropdown && !isExplorePage && (
+              {showDropdown && (
                 <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl overflow-hidden z-50 border border-gray-100">
                   <div className="py-1">
                     {dropdownResults.map(n => (
@@ -385,7 +433,7 @@ export default function Header({ variant = "home" }: HeaderProps) {
                     ))}
                   </div>
                   <div className="border-t border-gray-100">
-                    <button onClick={() => { setShowDropdown(false); router.push(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }}
+                    <button onClick={() => { setShowDropdown(false); router.push(`/explore?search=${encodeURIComponent(searchQuery.trim())}`); }}
                       className="w-full px-4 py-2.5 text-sm text-[var(--primary)] font-medium hover:bg-purple-50 transition-colors flex items-center justify-center gap-2">
                       <IconSearch size={14} />
                       Ver todos los resultados de &ldquo;{searchQuery}&rdquo;
@@ -408,7 +456,14 @@ export default function Header({ variant = "home" }: HeaderProps) {
             {/* Notifications */}
             <div ref={notifRef} className="relative">
               <button id="notifications-btn" title="Notificaciones"
-                onClick={() => { setNotifOpen(v => !v); markAllRead(); }}
+                onClick={() => { 
+                  setNotifOpen(v => !v); 
+                  markAllRead(); 
+                  // Solicitar permiso amistosamente al navegador
+                  if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                    Notification.requestPermission();
+                  }
+                }}
                 className="relative p-2 rounded-full text-white/80 hover:text-white hover:bg-white/15 transition-all duration-200">
                 <IconBell size={22} stroke={1.6} />
                 {unreadCount > 0 && (

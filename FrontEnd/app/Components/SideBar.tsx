@@ -2,16 +2,12 @@
 
 type Props = {
   categorias: string[];
-  rangoPrecio: number[];
-  setRangoPrecio: React.Dispatch<React.SetStateAction<number[]>>;
   categoriaActiva: string;
   setCategoriaActiva: React.Dispatch<React.SetStateAction<string>>;
 };
 
 export default function SideBar({
   categorias,
-  rangoPrecio,
-  setRangoPrecio,
   categoriaActiva,
   setCategoriaActiva,
 }: Props) {
@@ -38,27 +34,7 @@ export default function SideBar({
           </div>
         </div>
 
-        {/* Rango de precio */}
-        <div className="mb-6">
-          <h4 className="font-medium text-sm text-gray-600 mb-2">
-            Rango de precio
-          </h4>
-          <div className="space-y-2">
-            <input
-              type="range"
-              min="0"
-              max="10000"
-              step="50"
-              value={rangoPrecio[1]}
-              onChange={(e) => setRangoPrecio([0, parseInt(e.target.value)])}
-              className="w-full"
-            />
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>RD$0</span>
-              <span>RD${rangoPrecio[1]}+</span>
-            </div>
-          </div>
-        </div>
+
 
         {/* Calificación */}
         <div className="mb-6">

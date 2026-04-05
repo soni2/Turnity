@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { Negocio } from "./hooks/useDashboard";
 import Header from "../Components/Header";
+import PDFDownloadButton from "./components/PDFDownloadButton";
 
 export default function MisNegocioDashboard({
   negocio = [],
@@ -34,6 +35,7 @@ export default function MisNegocioDashboard({
     completados: 0,
     cancelados: 0,
   });
+  const [allTurnos, setAllTurnos] = useState<any[]>([]);
   const [businessStats, setBusinessStats] = useState<
     Record<string, { ingresosHoy: number; citasHoy: number; ingresosTotal: number }>
   >({});
@@ -74,13 +76,16 @@ export default function MisNegocioDashboard({
           id,
           estado,
           fecha,
+          hora_inicio,
           cliente_id,
+          cliente:cliente_id(nombre),
           empleado_id,
-          servicio:servicio_id(precio)
+          servicio:servicio_id(nombre, precio)
         `)
         .in("empleado_id", empleadoIds);
 
       if (turnos) {
+        setAllTurnos(turnos);
         const uniqueClients = new Set(turnos.map((t) => t.cliente_id).filter(Boolean));
         const completados = turnos.filter((t) => t.estado === "completado").length;
         const cancelados = turnos.filter((t) => t.estado === "cancelado").length;
@@ -167,13 +172,9 @@ export default function MisNegocioDashboard({
                 Resumen general de todos tus establecimientos
               </p>
             </div>
-            <button
-              className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium flex items-center gap-2 hover:bg-gray-50 transition-all shadow-sm"
-              onClick={() => alert("Función de exportar reporte en desarrollo")}
-            >
-              <IconDownload size={20} />
-              <span>Exportar reporte</span>
-            </button>
+            {!loadingStats && allTurnos.length > 0 && (
+              <PDFDownloadButton turnos={allTurnos} negocioNombre="Consolidado Todos los Negocios" />
+            )}
           </div>
 
           {/* 1. Stats Cards (Como en la imagen) */}
