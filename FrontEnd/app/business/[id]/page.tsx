@@ -19,13 +19,87 @@ import {
 import HorariosPreview from "@/app/dashboard/components/SchedulePreview";
 import PaymentModal from "@/app/Components/PaymentModal";
 
+type usuario = {
+  id: string;
+  nombre: string;
+  email: string;
+  telefono: string;
+  detalles: string;
+  direccion: string;
+  avatar_url: string;
+};
+
+type empleado = {
+  id: string;
+  nombre: string;
+  foto_url: string;
+  usuario: usuario;
+  biografia: string;
+};
+
+type servicio = {
+  id: string;
+  nombre: string;
+  precio: string;
+  duracion: string;
+  descripcion: string;
+  activo: boolean;
+};
+
+type profesional = {
+  id: string;
+  nombre: string;
+  especialidad: string;
+  experiencia: string;
+};
+
+type turno = {
+  id: string;
+  fecha: string;
+  hora_inicio: string;
+  estado: string;
+  servicio?: servicio;
+  empleado_id?: string;
+};
+
+type ResenaInfo = {
+  id: string;
+  rating: number;
+  comentario: string;
+  creado_en: string;
+  empleado_id?: string;
+  cliente?: {
+    nombre: string;
+    avatar_url: string | null;
+  };
+};
+
+type CentroData = {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  categoria: string;
+  telefono: string;
+  ciudad: string;
+  logo_url: string | null;
+  imagenes: string[];
+  horario: string;
+  horariosRaw: Record<string, { abierto: boolean; apertura: string; cierre: string }>;
+  horariosDisponibles: Record<string, string[]>;
+  servicios: (servicio & { disponible: boolean })[];
+  profesionales: (profesional & { foto_url: string | null; ratingStr: string; ratingCount: number })[];
+  resenas: ResenaInfo[];
+  turnosFuturos: turno[];
+  promedioRating: string;
+};
+
 export default function CentroPage() {
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
   const id = params.id as string;
 
-  const [centro, setCentro] = useState<any>(null);
+  const [centro, setCentro] = useState<CentroData | null>(null);
   const [loading, setLoading] = useState(true);
   const [favorito, setFavorito] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -103,7 +177,7 @@ export default function CentroPage() {
         .gte("fecha", todayStr);
 
       // 4. Obtener reseñas del negocio (Intentamos traer empleado_id si existe)
-      let reseñasMap = [];
+      let reseñasMap: ResenaInfo[] = [];
       const { data: resenas1, error: err1 } = await supabase
         .from("resena")
         .select(
@@ -121,13 +195,13 @@ export default function CentroPage() {
           )
           .eq("negocio_id", id)
           .order("creado_en", { ascending: false });
-        reseñasMap = resenas2 || [];
+        reseñasMap = (resenas2 as any) || [];
       } else {
-        reseñasMap = resenas1 || [];
+        reseñasMap = (resenas1 as any) || [];
       }
 
       const totalRating = reseñasMap.reduce(
-        (acc: number, curr: any) => acc + curr.rating,
+        (acc: number, curr: ResenaInfo) => acc + curr.rating,
         0,
       );
       const promedioRating =
@@ -202,11 +276,11 @@ export default function CentroPage() {
           negocio.telefono_contacto || negocio.telefono || "Sin teléfono",
         horario: horarioTexto,
         imagenes: fotosNegocio,
-        servicios: (servicios || []).map((s: any) => ({
+        servicios: (servicios || []).map((s: servicio) => ({
           ...s,
           disponible: s.activo !== false,
         })),
-        profesionales: ((empleados as any[]) || []).map((e) => {
+        profesionales: ((empleados as unknown as empleado[]) || []).map((e) => {
           const misReseñas = reseñasMap.filter(
             (r) => r.empleado_id && r.empleado_id === e.id,
           );
@@ -307,9 +381,9 @@ export default function CentroPage() {
       // Buscar si al menos existe 1 estilista libre en este slot.
       return allSlots.filter((slot) => {
         let ocupadosCount = 0;
-        centro.profesionales.forEach((pro: any) => {
+        centro.profesionales.forEach((pro) => {
           const proOcupado = centro.turnosFuturos.find(
-            (t: any) =>
+            (t) =>
               t.fecha === selectedDateObj.dateString &&
               t.hora_inicio.substring(0, 5) === slot &&
               t.empleado_id === pro.id,
@@ -322,11 +396,11 @@ export default function CentroPage() {
 
     // Si se seleccionó un profesional concreto
     const turnosDelPro = (centro.turnosFuturos || []).filter(
-      (t: any) =>
+      (t) =>
         t.fecha === selectedDateObj.dateString &&
         t.empleado_id === selectedProfesional,
     );
-    const horasOcupadas = turnosDelPro.map((t: any) =>
+    const horasOcupadas = turnosDelPro.map((t) =>
       t.hora_inicio.substring(0, 5),
     );
 
@@ -360,17 +434,18 @@ export default function CentroPage() {
         <Header variant="app" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
             {/* Columna izquierda - Esqueletos de info e imágenes */}
             <div className="lg:col-span-2 space-y-6">
-              
               {/* Esqueleto de Imagen */}
               <div className="flex flex-col gap-3 mb-6">
                 <div className="w-full h-64 md:h-[600px] rounded-3xl bg-gray-200 animate-pulse" />
                 <div className="flex gap-3 overflow-x-hidden pb-2">
-                   {[1, 2, 3, 4].map((i) => (
-                     <div key={i} className="h-20 w-24 sm:h-20 sm:w-28 rounded-2xl bg-gray-200 animate-pulse flex-shrink-0" />
-                   ))}
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="h-20 w-24 sm:h-20 sm:w-28 rounded-2xl bg-gray-200 animate-pulse flex-shrink-0"
+                    />
+                  ))}
                 </div>
               </div>
 
@@ -383,7 +458,7 @@ export default function CentroPage() {
                   </div>
                   <div className="w-24 h-12 bg-gray-200 rounded-2xl animate-pulse" />
                 </div>
-                
+
                 <div className="space-y-3 mb-8">
                   <div className="w-full h-4 bg-gray-200 rounded animate-pulse" />
                   <div className="w-full h-4 bg-gray-200 rounded animate-pulse" />
@@ -420,36 +495,41 @@ export default function CentroPage() {
                 <div className="w-48 h-8 bg-gray-200 rounded-lg animate-pulse mb-6" />
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="border border-gray-100 bg-gray-50 rounded-2xl p-5 flex justify-between items-start">
+                    <div
+                      key={i}
+                      className="border border-gray-100 bg-gray-50 rounded-2xl p-5 flex justify-between items-start"
+                    >
                       <div className="space-y-3 w-1/2">
-                         <div className="w-3/4 h-6 bg-gray-200 rounded animate-pulse" />
-                         <div className="w-full h-4 bg-gray-200 rounded animate-pulse" />
-                         <div className="w-24 h-6 bg-gray-200 rounded animate-pulse mt-3" />
+                        <div className="w-3/4 h-6 bg-gray-200 rounded animate-pulse" />
+                        <div className="w-full h-4 bg-gray-200 rounded animate-pulse" />
+                        <div className="w-24 h-6 bg-gray-200 rounded animate-pulse mt-3" />
                       </div>
                       <div className="w-20 h-8 bg-gray-200 rounded-lg animate-pulse" />
                     </div>
                   ))}
                 </div>
               </div>
-
             </div>
 
             {/* Columna derecha - Esqueleto Reserva */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-24 border border-gray-100">
                 <div className="w-40 h-6 bg-gray-200 rounded animate-pulse mb-6" />
-                
+
                 <div className="space-y-6">
                   <div>
                     <div className="w-48 h-4 bg-gray-200 rounded animate-pulse mb-3" />
                     <div className="w-full h-12 bg-gray-200 rounded-lg animate-pulse" />
                   </div>
-                  
+
                   <div>
                     <div className="w-32 h-4 bg-gray-200 rounded animate-pulse mb-3" />
                     <div className="grid grid-cols-4 gap-2">
-                      {[1, 2, 3, 4].map(i => (
-                        <div key={i} className="h-16 rounded-xl bg-gray-200 animate-pulse" />
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className="h-16 rounded-xl bg-gray-200 animate-pulse"
+                        />
                       ))}
                     </div>
                   </div>
@@ -457,8 +537,8 @@ export default function CentroPage() {
                   <div>
                     <div className="w-40 h-4 bg-gray-200 rounded animate-pulse mb-3" />
                     <div className="grid grid-cols-2 gap-3">
-                       <div className="h-16 rounded-xl bg-gray-200 animate-pulse" />
-                       <div className="h-16 rounded-xl bg-gray-200 animate-pulse" />
+                      <div className="h-16 rounded-xl bg-gray-200 animate-pulse" />
+                      <div className="h-16 rounded-xl bg-gray-200 animate-pulse" />
                     </div>
                   </div>
 
@@ -466,16 +546,18 @@ export default function CentroPage() {
                     <div className="w-48 h-4 bg-gray-200 rounded animate-pulse mb-3" />
                     <div className="grid grid-cols-3 gap-2">
                       {[1, 2, 3, 4, 5, 6].map((i) => (
-                        <div key={i} className="h-10 rounded-lg bg-gray-200 animate-pulse" />
+                        <div
+                          key={i}
+                          className="h-10 rounded-lg bg-gray-200 animate-pulse"
+                        />
                       ))}
                     </div>
                   </div>
-                  
+
                   <div className="w-full h-14 bg-gray-200 rounded-2xl animate-pulse mt-8" />
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -536,9 +618,9 @@ export default function CentroPage() {
     // Si eligio "Cualquiera", el sistema debe asignar de manera inteligente al empleado disponible en ese horario
     let finalEmpleadoId = selectedProfesional;
     if (selectedProfesional === "cualquiera") {
-      const profesionalesLibres = centro.profesionales.filter((pro: any) => {
+      const profesionalesLibres = centro.profesionales.filter((pro) => {
         const proTieneTurno = centro.turnosFuturos.find(
-          (t: any) =>
+          (t) =>
             t.fecha === selectedDate &&
             t.hora_inicio.substring(0, 5) === selectedTime &&
             t.empleado_id === pro.id,
@@ -718,7 +800,7 @@ export default function CentroPage() {
               <h3 className="font-bold text-2xl mb-6">Nuestros Servicios</h3>
               {centro.servicios && centro.servicios.length > 0 ? (
                 <div className="space-y-4">
-                  {centro.servicios.map((servicio: any) => (
+                  {centro.servicios.map((servicio) => (
                     <div
                       key={servicio.id}
                       className={`border rounded-2xl p-5 cursor-pointer transition-all duration-200 shadow-sm ${
@@ -768,7 +850,9 @@ export default function CentroPage() {
               ) : (
                 <div className="text-center p-8 bg-gray-50 border border-gray-100 rounded-2xl text-gray-500">
                   <span className="font-medium text-lg">Sin servicios</span>
-                  <p className="text-sm mt-1">Este negocio aún no ha añadido servicios a su catálogo.</p>
+                  <p className="text-sm mt-1">
+                    Este negocio aún no ha añadido servicios a su catálogo.
+                  </p>
                 </div>
               )}
             </div>
@@ -783,7 +867,7 @@ export default function CentroPage() {
               <h3 className="font-bold text-2xl mb-6">Nuestros Estilistas</h3>
               {centro.profesionales && centro.profesionales.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {centro.profesionales.map((pro: any) => (
+                  {centro.profesionales.map((pro) => (
                     <div
                       key={pro.id}
                       className="flex items-center p-4 bg-gray-50 border border-gray-100 rounded-2xl hover:shadow-md transition-shadow"
@@ -804,7 +888,9 @@ export default function CentroPage() {
                         )}
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900">{pro.nombre}</h4>
+                        <h4 className="font-bold text-gray-900">
+                          {pro.nombre}
+                        </h4>
                         <p className="text-xs text-gray-500 font-medium">
                           {pro.especialidad}
                         </p>
@@ -829,7 +915,10 @@ export default function CentroPage() {
               ) : (
                 <div className="text-center p-8 bg-gray-50 border border-gray-100 rounded-2xl text-gray-500">
                   <span className="font-medium text-lg">Aún sin equipo</span>
-                  <p className="text-sm mt-1">Este negocio todavía no cuenta con profesionales disponibles.</p>
+                  <p className="text-sm mt-1">
+                    Este negocio todavía no cuenta con profesionales
+                    disponibles.
+                  </p>
                 </div>
               )}
             </div>
@@ -852,7 +941,7 @@ export default function CentroPage() {
                   </div>
                 </div>
                 <div className="grid gap-4">
-                  {centro.resenas.map((res: any) => (
+                  {centro.resenas.map((res) => (
                     <div
                       key={res.id}
                       className="p-6 bg-gray-50 rounded-2xl border border-gray-100 relative"
@@ -929,7 +1018,7 @@ export default function CentroPage() {
                     <p className="font-medium">
                       {
                         centro.servicios.find(
-                          (s: any) => s.id === selectedService,
+                          (s) => s.id === selectedService,
                         )?.nombre
                       }
                     </p>
@@ -937,98 +1026,102 @@ export default function CentroPage() {
                 )}
 
                 {/* Selector de Profesional */}
-                {selectedService && (!centro.profesionales || centro.profesionales.length === 0) ? (
+                {selectedService &&
+                (!centro.profesionales || centro.profesionales.length === 0) ? (
                   <div className="mb-6 p-4 rounded-xl border border-red-100 bg-red-50 text-red-600 text-sm font-medium text-center">
-                    Este negocio no tiene personal registrado. No es posible agendar citas en este momento.
+                    Este negocio no tiene personal registrado. No es posible
+                    agendar citas en este momento.
                   </div>
-                ) : selectedService && (
-                  <div className="mb-6 animate-fade-in">
-                    <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">
-                        2
-                      </span>
-                      ¿Con quién te atenderás?
-                    </label>
-                    <div className="flex space-x-3 overflow-x-auto pb-4 scrollbar-none snap-x">
-                      {/* Opción Cualquiera */}
-                      <button
-                        onClick={() => {
-                          setSelectedProfesional("cualquiera");
-                          setSelectedDate(null);
-                          setSelectedTime("");
-                        }}
-                        className={`flex flex-col items-center min-w-[80px] snap-center p-3 rounded-2xl border-2 transition-all ${
-                          selectedProfesional === "cualquiera"
-                            ? "border-[var(--primary)] bg-purple-50 shadow-md transform scale-[1.02]"
-                            : "border-gray-100 bg-white hover:border-[var(--primary)]/30 hover:bg-gray-50"
-                        }`}
-                      >
-                        <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-colors ${
-                            selectedProfesional === "cualquiera"
-                              ? "bg-[var(--primary)] text-white"
-                              : "bg-gray-100 text-gray-400"
-                          }`}
-                        >
-                          <IconUser size={22} />
-                        </div>
-                        <span
-                          className={`text-[11px] font-bold text-center ${selectedProfesional === "cualquiera" ? "text-[var(--primary)]" : "text-gray-700"}`}
-                        >
-                          Cualquiera
+                ) : (
+                  selectedService && (
+                    <div className="mb-6 animate-fade-in">
+                      <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">
+                          2
                         </span>
-                      </button>
-
-                      {/* Lista de Profesionales del Centro */}
-                      {centro.profesionales?.map((pro: any) => (
+                        ¿Con quién te atenderás?
+                      </label>
+                      <div className="flex space-x-3 overflow-x-auto pb-4 scrollbar-none snap-x">
+                        {/* Opción Cualquiera */}
                         <button
-                          key={pro.id}
                           onClick={() => {
-                            setSelectedProfesional(pro.id);
+                            setSelectedProfesional("cualquiera");
                             setSelectedDate(null);
                             setSelectedTime("");
                           }}
-                          className={`flex flex-col items-center min-w-[85px] snap-center p-3 rounded-2xl border-2 transition-all ${
-                            selectedProfesional === pro.id
+                          className={`flex flex-col items-center min-w-[80px] snap-center p-3 rounded-2xl border-2 transition-all ${
+                            selectedProfesional === "cualquiera"
                               ? "border-[var(--primary)] bg-purple-50 shadow-md transform scale-[1.02]"
                               : "border-gray-100 bg-white hover:border-[var(--primary)]/30 hover:bg-gray-50"
                           }`}
                         >
                           <div
-                            className={`w-12 h-12 rounded-full overflow-hidden mb-2 border-2 ${selectedProfesional === pro.id ? "border-[var(--primary)]" : "border-gray-100"}`}
+                            className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-colors ${
+                              selectedProfesional === "cualquiera"
+                                ? "bg-[var(--primary)] text-white"
+                                : "bg-gray-100 text-gray-400"
+                            }`}
                           >
-                            {pro.foto_url ? (
-                              <Image
-                                src={pro.foto_url}
-                                alt={pro.nombre}
-                                width={48}
-                                height={48}
-                                className="object-cover w-full h-full"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-500">
-                                {pro.nombre.charAt(0).toUpperCase()}
-                              </div>
-                            )}
+                            <IconUser size={22} />
                           </div>
                           <span
-                            className={`text-[11px] font-bold truncate w-full text-center ${selectedProfesional === pro.id ? "text-[var(--primary)]" : "text-gray-900"}`}
+                            className={`text-[11px] font-bold text-center ${selectedProfesional === "cualquiera" ? "text-[var(--primary)]" : "text-gray-700"}`}
                           >
-                            {pro.nombre.split(" ")[0]}
+                            Cualquiera
                           </span>
-                          <div className="flex items-center gap-0.5 mt-1">
-                            <IconStarFilled
-                              size={10}
-                              className="text-amber-500"
-                            />
-                            <span className="text-[10px] text-gray-600 font-semibold">
-                              {pro.ratingStr}
-                            </span>
-                          </div>
                         </button>
-                      ))}
+
+                        {/* Lista de Profesionales del Centro */}
+                        {centro.profesionales?.map((pro) => (
+                          <button
+                            key={pro.id}
+                            onClick={() => {
+                              setSelectedProfesional(pro.id);
+                              setSelectedDate(null);
+                              setSelectedTime("");
+                            }}
+                            className={`flex flex-col items-center min-w-[85px] snap-center p-3 rounded-2xl border-2 transition-all ${
+                              selectedProfesional === pro.id
+                                ? "border-[var(--primary)] bg-purple-50 shadow-md transform scale-[1.02]"
+                                : "border-gray-100 bg-white hover:border-[var(--primary)]/30 hover:bg-gray-50"
+                            }`}
+                          >
+                            <div
+                              className={`w-12 h-12 rounded-full overflow-hidden mb-2 border-2 ${selectedProfesional === pro.id ? "border-[var(--primary)]" : "border-gray-100"}`}
+                            >
+                              {pro.foto_url ? (
+                                <Image
+                                  src={pro.foto_url}
+                                  alt={pro.nombre}
+                                  width={48}
+                                  height={48}
+                                  className="object-cover w-full h-full"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-500">
+                                  {pro.nombre.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              className={`text-[11px] font-bold truncate w-full text-center ${selectedProfesional === pro.id ? "text-[var(--primary)]" : "text-gray-900"}`}
+                            >
+                              {pro.nombre.split(" ")[0]}
+                            </span>
+                            <div className="flex items-center gap-0.5 mt-1">
+                              <IconStarFilled
+                                size={10}
+                                className="text-amber-500"
+                              />
+                              <span className="text-[10px] text-gray-600 font-semibold">
+                                {pro.ratingStr}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
 
                 {/* Selector de día */}
@@ -1094,7 +1187,7 @@ export default function CentroPage() {
                         }}
                       >
                         <option value="">Seleccionar hora disponible</option>
-                        {availableTimesForSelectedDate?.map((hora: any) => (
+                        {availableTimesForSelectedDate?.map((hora) => (
                           <option key={hora} value={hora}>
                             {hora}
                           </option>
@@ -1114,7 +1207,7 @@ export default function CentroPage() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-4 gap-2">
-                            {availableTimesForSelectedDate?.map((hora: any) => (
+                            {availableTimesForSelectedDate?.map((hora) => (
                               <button
                                 key={hora}
                                 onClick={() => setSelectedTime(hora)}
@@ -1172,7 +1265,7 @@ export default function CentroPage() {
       {/* Payment Modal */}
       {(() => {
         const servicioSeleccionado = centro?.servicios?.find(
-          (s: any) => s.id === selectedService,
+          (s) => s.id === selectedService,
         );
         return (
           <PaymentModal
@@ -1181,7 +1274,7 @@ export default function CentroPage() {
             onPaymentSuccess={handleConfirmedPayment}
             negocio={centro?.nombre ?? ""}
             servicio={servicioSeleccionado?.nombre ?? ""}
-            precio={servicioSeleccionado?.precio ?? 0}
+            precio={Number(servicioSeleccionado?.precio ?? 0)}
             fecha={selectedDate ?? ""}
             hora={selectedTime}
           />
