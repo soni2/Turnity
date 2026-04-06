@@ -26,6 +26,7 @@ export default function useRegistrationBusiness() {
     lat: 18.4861,
     lng: -69.9312,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [direccionMapa, setDireccionMapa] = useState("");
   const [formData, setFormData] = useState<FormData>({
@@ -340,6 +341,9 @@ export default function useRegistrationBusiness() {
   }
 
   const handleCreate = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    
     try {
       const res = await fetch("/api/create", {
         method: "POST",
@@ -414,6 +418,8 @@ export default function useRegistrationBusiness() {
       console.log("Proceso finalizado con éxito");
     } catch (err) {
       console.error("Error crítico en handleCreate:", err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -508,5 +514,6 @@ export default function useRegistrationBusiness() {
     renderPaso,
     handleCreate,
     isPasoValido,
+    isSubmitting,
   };
 }

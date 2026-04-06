@@ -13,6 +13,7 @@ export default function BusinessForm() {
     handleCreate,
     isPasoValido,
     negocioCreado,
+    isSubmitting,
   } = useRegistrationBusiness();
 
   // ── Mostrar pantalla de éxito tras crear el negocio ──────────
@@ -24,7 +25,6 @@ export default function BusinessForm() {
       />
     );
   }
-
 
   const pasoValido = isPasoValido(paso);
 
@@ -58,8 +58,9 @@ export default function BusinessForm() {
         <div className="flex justify-between mt-6 pt-6 border-t gap-4">
           {/* Botón Anterior */}
           <Buttons
+            type="button"
             onClick={() => setPaso((prev) => Math.max(1, prev - 1))}
-            disabled={paso === 1}
+            disabled={paso === 1 || isSubmitting}
             className="px-6 py-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-xl font-semibold transition-all"
           >
             Anterior
@@ -68,6 +69,7 @@ export default function BusinessForm() {
           {/* Botón Siguiente / Completar */}
           {paso < 6 ? (
             <Buttons
+              type="button"
               onClick={() => pasoValido && setPaso((prev) => prev + 1)}
               disabled={!pasoValido}
               className="px-6 py-3 bg-black text-white rounded-xl font-semibold hover:bg-gray-800 transition-all"
@@ -76,11 +78,12 @@ export default function BusinessForm() {
             </Buttons>
           ) : (
             <Buttons
+              type="button"
               onClick={pasoValido ? handleCreate : undefined}
-              disabled={!pasoValido}
+              disabled={!pasoValido || isSubmitting}
               className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-all"
             >
-              ✓ Completar registro
+              {isSubmitting ? "Creando negocio..." : "✓ Completar registro"}
             </Buttons>
           )}
         </div>

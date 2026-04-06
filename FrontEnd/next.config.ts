@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   /* Photo dir configuration */
   images: {
     domains: ["wgkkcfnhlncoobscgsfc.supabase.co", "images.unsplash.com"],
-
   },
 };
 
