@@ -84,10 +84,17 @@ type CentroData = {
   logo_url: string | null;
   imagenes: string[];
   horario: string;
-  horariosRaw: Record<string, { abierto: boolean; apertura: string; cierre: string }>;
+  horariosRaw: Record<
+    string,
+    { abierto: boolean; apertura: string; cierre: string }
+  >;
   horariosDisponibles: Record<string, string[]>;
   servicios: (servicio & { disponible: boolean })[];
-  profesionales: (profesional & { foto_url: string | null; ratingStr: string; ratingCount: number })[];
+  profesionales: (profesional & {
+    foto_url: string | null;
+    ratingStr: string;
+    ratingCount: number;
+  })[];
   resenas: ResenaInfo[];
   turnosFuturos: turno[];
   promedioRating: string;
@@ -98,6 +105,7 @@ export default function CentroPage() {
   const router = useRouter();
   const pathname = usePathname();
   const id = params.id as string;
+  const supabase = createClient();
 
   const [centro, setCentro] = useState<CentroData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,6 +115,9 @@ export default function CentroPage() {
   const [selectedProfesional, setSelectedProfesional] = useState<string | null>(
     null,
   );
+
+  const [user, setUser] = useState<any>(null);
+
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -300,7 +311,7 @@ export default function CentroPage() {
             ratingCount: misReseñas.length,
           };
         }),
-        horariosDisponibles, // Computed dynamically
+        horariosDisponibles,
         horariosRaw,
         resenas: reseñasMap,
         turnosFuturos: turnos || [],
@@ -1017,9 +1028,8 @@ export default function CentroPage() {
                     </p>
                     <p className="font-medium">
                       {
-                        centro.servicios.find(
-                          (s) => s.id === selectedService,
-                        )?.nombre
+                        centro.servicios.find((s) => s.id === selectedService)
+                          ?.nombre
                       }
                     </p>
                   </div>

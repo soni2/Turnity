@@ -4,6 +4,7 @@ import Logo from "../Components/Logo";
 import Input from "../Components/Input";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import PasswordValidator from "../Components/PasswordValidator";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -88,6 +89,14 @@ export default function UpdatePasswordPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
+
+            {(password || confirmPassword) && (
+              <PasswordValidator 
+                password={password} 
+                confirmPassword={confirmPassword} 
+                showMatch={true} 
+              />
+            )}
 
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-center">

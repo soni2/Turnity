@@ -7,6 +7,7 @@ import { GoogleIcon } from "../Components/Icons";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import PasswordValidator from "../Components/PasswordValidator";
 
 function LoginContent() {
   const router = useRouter();
@@ -165,6 +166,10 @@ function LoginContent() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+
+                {password && (
+                  <PasswordValidator password={password} />
+                )}
 
                 <div className="flex items-center justify-between text-sm">
                   <label className="flex items-center gap-2 text-gray-600">

@@ -2,8 +2,26 @@ import { Titles } from "@/app/Components/Titles";
 import BusinessForm from "./components/BusinessForm";
 import Link from "next/link";
 import { IconArrowLeft } from "@tabler/icons-react";
+import NoAuth from "@/app/dashboard/[id]/NoAuth";
+import { createClient } from "@/lib/supabase/server";
+import Header from "@/app/Components/Header";
 
 export default async function RegistroNegocioPage() {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+  
+    if (!user) {
+      return (
+        <>
+          <Header variant="app" />
+          <NoAuth />
+        </>
+      );
+    }
+
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">

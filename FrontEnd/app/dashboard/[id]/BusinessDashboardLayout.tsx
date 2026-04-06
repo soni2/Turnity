@@ -91,9 +91,11 @@ const DIAS_MAP = [
 export default function BusinessDashboardLayout({
   data,
   id,
+  isEmpleado = false,
 }: {
   data: NegocioDetalle[];
   id: string;
+  isEmpleado?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -544,31 +546,38 @@ export default function BusinessDashboardLayout({
             >
               <IconArrowLeft size={16} className="mr-1" /> Volver a mis negocios
             </Link>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setInfoEdit({
-                    nombre: negocio.nombre || "",
-                    email_contacto: negocio.email_contacto || "",
-                    telefono_contacto: negocio.telefono_contacto || "",
-                    descripcion: negocio.descripcion || "",
-                    categoria: negocio.categoria || "",
-                  });
-                  setEditInfoOpen(true);
-                }}
-                className="flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <IconEdit size={15} />
-                Editar negocio
-              </button>
-              <button
-                onClick={() => { setDeleteNegocioConfirm(""); setDeleteNegocioOpen(true); }}
-                className="flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <IconTrash size={15} />
-                Eliminar
-              </button>
-            </div>
+            {!isEmpleado && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setInfoEdit({
+                      nombre: negocio.nombre || "",
+                      email_contacto: negocio.email_contacto || "",
+                      telefono_contacto: negocio.telefono_contacto || "",
+                      descripcion: negocio.descripcion || "",
+                      categoria: negocio.categoria || "",
+                    });
+                    setEditInfoOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <IconEdit size={15} />
+                  Editar negocio
+                </button>
+                <button
+                  onClick={() => { setDeleteNegocioConfirm(""); setDeleteNegocioOpen(true); }}
+                  className="flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <IconTrash size={15} />
+                  Eliminar
+                </button>
+              </div>
+            )}
+            {isEmpleado && (
+              <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200">
+                👁 Vista de empleado — solo lectura
+              </span>
+            )}
           </div>
 
           {/* Info del negocio */}
@@ -586,24 +595,26 @@ export default function BusinessDashboardLayout({
                   {negocio.nombre.charAt(0)}
                 </div>
               )}
-              {/* Overlay para editar logo */}
-              <label 
-                title="Cambiar logo"
-                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity duration-200 text-white z-10"
-              >
-                {uploadingLogo ? (
-                   <IconLoader2 size={20} className="animate-spin" />
-                ) : (
-                   <IconEdit size={20} />
-                )}
-                <input
-                   type="file"
-                   accept="image/*"
-                   className="hidden"
-                   onChange={handleLogoUpload}
-                   disabled={uploadingLogo}
-                />
-              </label>
+              {/* Overlay para editar logo — solo dueño */}
+              {!isEmpleado && (
+                <label
+                  title="Cambiar logo"
+                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity duration-200 text-white z-10"
+                >
+                  {uploadingLogo ? (
+                    <IconLoader2 size={20} className="animate-spin" />
+                  ) : (
+                    <IconEdit size={20} />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                    disabled={uploadingLogo}
+                  />
+                </label>
+              )}
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{negocio.nombre}</h1>
@@ -613,24 +624,29 @@ export default function BusinessDashboardLayout({
             </div>
           </div>
 
-          {/* Tabs */}
+          {/* Tabs — empleados no ven Servicios ni Fotos */}
           <div className="flex space-x-8 overflow-x-auto">
-            {["Resumen", "Servicios", "Equipo", "Fotos"].map((tab) => {
-              const tabId = tab.toLowerCase();
-              return (
-                <button
-                  key={tabId}
-                  onClick={() => setActiveTab(tabId)}
-                  className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tabId
-                      ? "border-[var(--primary)] text-[var(--primary)]"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  {tab}
-                </button>
-              );
-            })}
+            {["Resumen", "Servicios", "Equipo", "Fotos"]
+              .filter((tab) => {
+                if (isEmpleado && (tab === "Servicios" || tab === "Fotos")) return false;
+                return true;
+              })
+              .map((tab) => {
+                const tabId = tab.toLowerCase();
+                return (
+                  <button
+                    key={tabId}
+                    onClick={() => setActiveTab(tabId)}
+                    className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      activeTab === tabId
+                        ? "border-[var(--primary)] text-[var(--primary)]"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
           </div>
         </div>
       </div>
@@ -966,16 +982,22 @@ export default function BusinessDashboardLayout({
               <div className="flex justify-between flex-col md:flex-row md:items-center gap-4 mb-6">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">Mi Equipo</h3>
-                  <p className="text-sm text-gray-500 mt-1">Comparte este enlace para que otros profesionales se unan a tu negocio.</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {isEmpleado
+                      ? "Conoce a los profesionales que forman parte de este negocio."
+                      : "Comparte este enlace para que otros profesionales se unan a tu negocio."}
+                  </p>
                 </div>
-                <button
-                  onClick={handleCopiarEnlace}
-                  disabled={generandoLink}
-                  className="text-sm bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
-                >
-                  {generandoLink ? <IconLoader2 size={16} className="animate-spin" /> : <IconPlus size={16} />}
-                  {generandoLink ? "Generando..." : "Copiar enlace de invitación"}
-                </button>
+                {!isEmpleado && (
+                  <button
+                    onClick={handleCopiarEnlace}
+                    disabled={generandoLink}
+                    className="text-sm bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
+                  >
+                    {generandoLink ? <IconLoader2 size={16} className="animate-spin" /> : <IconPlus size={16} />}
+                    {generandoLink ? "Generando..." : "Copiar enlace de invitación"}
+                  </button>
+                )}
               </div>
 
               {dataLoading ? (
@@ -1019,16 +1041,18 @@ export default function BusinessDashboardLayout({
                       {emp.biografia && (
                         <p className="text-xs text-gray-500 mt-1 line-clamp-2">{emp.biografia}</p>
                       )}
-                      <button
-                        onClick={() => handleEliminarEmpleado(emp.id)}
-                        disabled={eliminandoEmpleadoId === emp.id}
-                        className="mt-3 flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {eliminandoEmpleadoId === emp.id
-                          ? <IconLoader2 size={13} className="animate-spin" />
-                          : <IconTrash size={13} />}
-                        Eliminar del equipo
-                      </button>
+                      {!isEmpleado && (
+                        <button
+                          onClick={() => handleEliminarEmpleado(emp.id)}
+                          disabled={eliminandoEmpleadoId === emp.id}
+                          className="mt-3 flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {eliminandoEmpleadoId === emp.id
+                            ? <IconLoader2 size={13} className="animate-spin" />
+                            : <IconTrash size={13} />}
+                          Eliminar del equipo
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

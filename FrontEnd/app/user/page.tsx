@@ -1,18 +1,5 @@
-import { request } from "http";
 import UserData from "./UserData";
 import { createClient } from "@/lib/supabase/server";
-
-// type UserDataProps = {
-//   nombre: string;
-//   email: string;
-//   telefono: string;
-//   detalles: string;
-//   registerDate: string;
-//   profilePicture: string;
-//   direction: string;
-//   turno?: any[];
-//   negocio?: string;
-// };
 
 export default async function InformacionUsuarioPage() {
   const supabase = await createClient();
@@ -24,13 +11,11 @@ export default async function InformacionUsuarioPage() {
     return <div>No autorizado</div>;
   }
 
-  // Obtenemos todos los campos reales del usuario
+  // Perfil del usuario
   const { data: profile, error } = await supabase
     .from("usuario")
-    .select(
-      "id, nombre, email, telefono, avatar_url, detalles, direction, creado_en",
-    )
-    .eq("id", user?.id)
+    .select("id, nombre, email, telefono, avatar_url, detalles, direction, creado_en")
+    .eq("id", user.id)
     .single();
 
   if (error) {
@@ -41,18 +26,36 @@ export default async function InformacionUsuarioPage() {
     );
   }
 
-  // Obtenemos los turnos del usuario con los nombres de negocio y servicio para la interfaz
+  // Citas del usuario
   const { data: turnos } = await supabase
     .from("turno")
     .select("*, servicio(nombre, negocio(id, nombre))")
-    .eq("cliente_id", user?.id)
+    .eq("cliente_id", user.id)
     .order("fecha", { ascending: false });
 
-  // Obtenemos negocios donde este usuario sea dueño (siempre y cuando el esquema negocio tenga dueno_id)
-  const { data: negocios } = await supabase
+  // Negocios donde es DUEÑO
+  const { data: negociosDueno } = await supabase
     .from("negocio")
     .select("id, nombre, logo_url")
-    .eq("dueno_id", user?.id);
+    .eq("dueno_id", user.id);
+
+  // Negocios donde es EMPLEADO activo
+  const { data: empleadoRows } = await supabase
+    .from("empleado")
+    .select("negocio:negocio_id(id, nombre, logo_url)")
+    .eq("usuario_id", user.id)
+    .eq("activo", true);
+
+  const negociosEmpleado = (empleadoRows ?? [])
+    .map((r: any) => r.negocio)
+    .filter(Boolean);
+
+  // Unir ambos (evitando duplicados por si fuese dueño y empleado a la vez)
+  const duenIdSet = new Set((negociosDueno ?? []).map((n: any) => n.id));
+  const negociosUnidos = [
+    ...(negociosDueno ?? []),
+    ...negociosEmpleado.filter((n: any) => !duenIdSet.has(n.id)),
+  ];
 
   return (
     <UserData
@@ -65,7 +68,7 @@ export default async function InformacionUsuarioPage() {
       profilePicture={profile?.avatar_url}
       direction={profile?.direction}
       citas={turnos || []}
-      negocio={negocios || []}
+      negocio={negociosUnidos}
     />
   );
 }

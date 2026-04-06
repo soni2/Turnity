@@ -7,17 +7,13 @@ export default async function GeneralDashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  // if (!user) {
-  //   router.push("/login");
-  //   return
-  // }
 
   if (!user) {
     return <div>No autorizado</div>;
-  } else {
   }
 
-  const { data: business, error } = await supabase
+  // Negocios donde es DUEÑO
+  const { data: negociosDueno, error } = await supabase
     .from("negocio")
     .select("*")
     .eq("dueno_id", user.id);
@@ -25,5 +21,24 @@ export default async function GeneralDashboardPage() {
   if (error) {
     return <div>Error: {error.message}</div>;
   }
-  return <DashboardLayout negocio={business} />;
+
+  // Negocios donde es EMPLEADO activo
+  const { data: empleadoRows } = await supabase
+    .from("empleado")
+    .select("negocio:negocio_id(*)")
+    .eq("usuario_id", user.id)
+    .eq("activo", true);
+
+  const negociosEmpleado = (empleadoRows ?? [])
+    .map((r: any) => r.negocio)
+    .filter(Boolean);
+
+  // Merge evitando duplicados
+  const duenIdSet = new Set((negociosDueno ?? []).map((n: any) => n.id));
+  const negociosUnidos = [
+    ...(negociosDueno ?? []),
+    ...negociosEmpleado.filter((n: any) => !duenIdSet.has(n.id)),
+  ];
+
+  return <DashboardLayout negocio={negociosUnidos} />;
 }

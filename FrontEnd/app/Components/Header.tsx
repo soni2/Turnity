@@ -22,7 +22,7 @@ import {
 } from "@tabler/icons-react";
 
 type HeaderProps = {
-  variant?: "home" | "app";
+  variant?: "home" | "app" | "guest";
 };
 
 type Negocio = {
@@ -369,8 +369,94 @@ export default function Header({ variant = "home" }: HeaderProps) {
   const textStyles = solid ? "text-white"          : "text-[var(--primary)]";
   const isActive   = (path: string) => pathname === path;
 
+  /* ── Variante GUEST (unauthenticated pages: /login, /register, etc.) ── */
+  if (variant === "guest") {
+    return (
+      <nav className="w-full fixed top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <Logo className="fill-[var(--primary)] h-6" />
+          </Link>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors px-3 py-1.5 rounded-lg hover:bg-gray-100"
+            >
+              Iniciar sesión
+            </Link>
+            <Link
+              href="/register"
+              className="text-sm font-semibold text-white bg-[var(--primary)] hover:opacity-90 transition-opacity px-4 py-2 rounded-xl"
+            >
+              Registrarse
+            </Link>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
   /* ── Variante APP ── */
   if (!isHome) {
+    /* ── APP sin sesión: barra simplificada para visitantes ── */
+    if (!user) {
+      return (
+        <nav className="w-full fixed top-0 z-50 bg-[var(--primary)] shadow-md">
+          <div className="md:max-w-[1200px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
+            <Link href="/explore" className="flex items-center gap-2 shrink-0">
+              <Logo className="fill-white h-5 md:h-7" />
+            </Link>
+
+            {/* Buscador compacto */}
+            <div ref={searchRef} className="relative flex-1 max-w-md hidden sm:block">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none">
+                <IconSearch size={16} />
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => dropdownResults.length > 0 && setShowDropdown(true)}
+                placeholder="Buscar servicios, negocios..."
+                autoComplete="off"
+                className="w-full pl-9 pr-4 py-2 rounded-full text-sm bg-white/15 text-white placeholder-white/60 border border-white/25 focus:outline-none focus:bg-white/25 focus:border-white/50 transition-all"
+              />
+              {showDropdown && (
+                <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl overflow-hidden z-50 border border-gray-100">
+                  <div className="py-1">
+                    {dropdownResults.map(n => (
+                      <button key={n.id} onClick={() => { setShowDropdown(false); setSearchQuery(""); router.push(`/business/${n.id}`); }}
+                        className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-purple-50 transition-colors">
+                        <span className="block text-sm font-medium text-gray-900 truncate">{n.nombre}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* CTAs para invitado */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => router.push(`/login?next=${encodeURIComponent(pathname)}`)}
+                className="text-sm font-medium text-white/80 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all"
+              >
+                Iniciar sesión
+              </button>
+              <Link
+                href="/register"
+                className="text-sm font-semibold bg-white text-[var(--primary)] hover:opacity-90 transition-opacity px-4 py-2 rounded-xl"
+              >
+                Registrarse
+              </Link>
+            </div>
+          </div>
+        </nav>
+      );
+    }
+
     return (
     <>
       <nav className="w-full fixed top-0 z-50 bg-[var(--primary)] shadow-md">
