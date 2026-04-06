@@ -1,6 +1,7 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   IconArrowLeft,
   IconSettings,
@@ -15,6 +16,7 @@ import {
   IconCurrencyDollar,
   IconStar,
   IconUpload,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -94,6 +96,7 @@ export default function BusinessDashboardLayout({
   id: string;
 }) {
   const supabase = createClient();
+  const router = useRouter();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("resumen");
@@ -340,6 +343,29 @@ export default function BusinessDashboardLayout({
 
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [generandoLink, setGenerandoLink] = useState(false);
+
+  const handleCopiarEnlace = async () => {
+    setGenerandoLink(true);
+    try {
+      const res = await fetch("/api/create-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ negocioId: id }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        if (typeof showToast !== 'undefined') showToast(resData.error || "Error al crear enlace", "err");
+      } else {
+        await navigator.clipboard.writeText(resData.link);
+        if (typeof showToast !== 'undefined') showToast("¡Enlace seguro de invitación copiado al portapapeles!");
+      }
+    } catch (err) {
+      if (typeof showToast !== 'undefined') showToast("Hubo un error al generar el enlace", "err");
+    } finally {
+      setGenerandoLink(false);
+    }
+  };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -442,6 +468,46 @@ export default function BusinessDashboardLayout({
     }
   };
 
+  // ── Eliminar empleado ───────────────────────────────────────────────────────
+  const [eliminandoEmpleadoId, setEliminandoEmpleadoId] = useState<string | null>(null);
+
+  const handleEliminarEmpleado = async (empId: string) => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar a este empleado del negocio? Esta acción no se puede deshacer.")) return;
+    setEliminandoEmpleadoId(empId);
+    const { error } = await supabase
+      .from("empleado")
+      .update({ activo: false })
+      .eq("id", empId);
+    setEliminandoEmpleadoId(null);
+    if (error) {
+      showToast("Error al eliminar el empleado.", "err");
+    } else {
+      setEmpleados((prev) => prev.filter((e) => e.id !== empId));
+      showToast("Empleado eliminado del negocio.");
+    }
+  };
+
+  // ── Eliminar negocio ────────────────────────────────────────────────────────
+  const [deleteNegocioOpen, setDeleteNegocioOpen] = useState(false);
+  const [deleteNegocioConfirm, setDeleteNegocioConfirm] = useState("");
+  const [deletingNegocio, setDeletingNegocio] = useState(false);
+
+  const handleEliminarNegocio = async () => {
+    if (deleteNegocioConfirm !== negocio.nombre) return;
+    setDeletingNegocio(true);
+    const { error } = await supabase
+      .from("negocio")
+      .delete()
+      .eq("id", id);
+    setDeletingNegocio(false);
+    if (error) {
+      showToast("Error al eliminar el negocio.", "err");
+      setDeleteNegocioOpen(false);
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
   if (!negocio) return null;
 
   const turnosMostrar = verTodasPendientes
@@ -478,22 +544,31 @@ export default function BusinessDashboardLayout({
             >
               <IconArrowLeft size={16} className="mr-1" /> Volver a mis negocios
             </Link>
-            <button
-              onClick={() => {
-                setInfoEdit({
-                  nombre: negocio.nombre || "",
-                  email_contacto: negocio.email_contacto || "",
-                  telefono_contacto: negocio.telefono_contacto || "",
-                  descripcion: negocio.descripcion || "",
-                  categoria: negocio.categoria || "",
-                });
-                setEditInfoOpen(true);
-              }}
-              className="flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <IconEdit size={15} />
-              Editar negocio
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setInfoEdit({
+                    nombre: negocio.nombre || "",
+                    email_contacto: negocio.email_contacto || "",
+                    telefono_contacto: negocio.telefono_contacto || "",
+                    descripcion: negocio.descripcion || "",
+                    categoria: negocio.categoria || "",
+                  });
+                  setEditInfoOpen(true);
+                }}
+                className="flex items-center gap-1.5 text-sm font-medium text-[var(--primary)] bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <IconEdit size={15} />
+                Editar negocio
+              </button>
+              <button
+                onClick={() => { setDeleteNegocioConfirm(""); setDeleteNegocioOpen(true); }}
+                className="flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <IconTrash size={15} />
+                Eliminar
+              </button>
+            </div>
           </div>
 
           {/* Info del negocio */}
@@ -894,16 +969,12 @@ export default function BusinessDashboardLayout({
                   <p className="text-sm text-gray-500 mt-1">Comparte este enlace para que otros profesionales se unan a tu negocio.</p>
                 </div>
                 <button
-                  onClick={() => {
-                    const inviteLink = `${window.location.origin}/business-registration/join?negocio_id=${id}`;
-                    navigator.clipboard.writeText(inviteLink);
-                    if (typeof showToast !== 'undefined') {
-                       showToast("¡Enlace de invitación copiado al portapapeles!");
-                    }
-                  }}
-                  className="text-sm bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition-all flex items-center gap-2 whitespace-nowrap"
+                  onClick={handleCopiarEnlace}
+                  disabled={generandoLink}
+                  className="text-sm bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
                 >
-                  <IconPlus size={16} /> Copiar enlace de invitación
+                  {generandoLink ? <IconLoader2 size={16} className="animate-spin" /> : <IconPlus size={16} />}
+                  {generandoLink ? "Generando..." : "Copiar enlace de invitación"}
                 </button>
               </div>
 
@@ -948,6 +1019,16 @@ export default function BusinessDashboardLayout({
                       {emp.biografia && (
                         <p className="text-xs text-gray-500 mt-1 line-clamp-2">{emp.biografia}</p>
                       )}
+                      <button
+                        onClick={() => handleEliminarEmpleado(emp.id)}
+                        disabled={eliminandoEmpleadoId === emp.id}
+                        className="mt-3 flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {eliminandoEmpleadoId === emp.id
+                          ? <IconLoader2 size={13} className="animate-spin" />
+                          : <IconTrash size={13} />}
+                        Eliminar del equipo
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1338,6 +1419,62 @@ export default function BusinessDashboardLayout({
                   <IconCheck size={16} />
                 )}
                 {editServicioModal === "nuevo" ? "Crear servicio" : "Guardar cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Eliminar Negocio ─────────────────────────────────────────── */}
+      {deleteNegocioOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="bg-red-600 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white">
+                <IconAlertTriangle size={20} />
+                <h2 className="font-semibold">Eliminar negocio</h2>
+              </div>
+              <button onClick={() => setDeleteNegocioOpen(false)} className="text-white/70 hover:text-white">
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700">
+                Esta acción es <strong>permanente e irreversible</strong>. Se eliminarán todos
+                los datos del negocio incluyendo servicios, empleados y citas.
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-sm text-red-700 font-medium">
+                  Para confirmar, escribe exactamente el nombre del negocio:
+                </p>
+                <p className="text-sm font-bold text-red-900 mt-1 select-all">{negocio.nombre}</p>
+              </div>
+              <input
+                type="text"
+                value={deleteNegocioConfirm}
+                onChange={(e) => setDeleteNegocioConfirm(e.target.value)}
+                placeholder="Escribe el nombre del negocio..."
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setDeleteNegocioOpen(false)}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminarNegocio}
+                disabled={deletingNegocio || deleteNegocioConfirm !== negocio.nombre}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingNegocio ? (
+                  <IconLoader2 size={16} className="animate-spin" />
+                ) : (
+                  <IconTrash size={16} />
+                )}
+                Eliminar negocio
               </button>
             </div>
           </div>
