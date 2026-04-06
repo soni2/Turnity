@@ -14,6 +14,7 @@ import {
   IconUsers,
   IconCurrencyDollar,
   IconStar,
+  IconUpload,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -33,6 +34,7 @@ type NegocioDetalle = {
   direccion: string | null;
   ciudad: string | null;
   horarios: Record<string, { abierto: boolean; apertura: string; cierre: string }>;
+  fotos: string[] | null;
 };
 
 type Servicio = {
@@ -336,6 +338,110 @@ export default function BusinessDashboardLayout({
     }
   };
 
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    setUploadingLogo(true);
+    const file = e.target.files[0];
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `/${id}/logo_${Date.now()}.${ext}`;
+
+    const { error } = await supabase.storage
+        .from("negocios")
+        .upload(path, file, { cacheControl: "3600", upsert: true });
+
+    if (error) {
+       showToast("Error al subir el logo", "err");
+    } else {
+       const { data: urlData } = supabase.storage.from("negocios").getPublicUrl(path);
+       const newLogoUrl = urlData.publicUrl;
+
+       const { error: updateError } = await supabase
+         .from("negocio")
+         .update({ logo_url: newLogoUrl })
+         .eq("id", id);
+         
+       if (!updateError) {
+          setNegocio(prev => ({ ...prev, logo_url: newLogoUrl }));
+          showToast("Logo actualizado correctamente.");
+       } else {
+          showToast("Error al guardar el logo", "err");
+       }
+    }
+    setUploadingLogo(false);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+
+    const newFiles = Array.from(e.target.files);
+    let fotosActuales = [...(negocio.fotos || [])];
+
+    if (fotosActuales.length + newFiles.length > 3) {
+      showToast("Solo puedes tener un máximo de 3 fotos.", "err");
+      return;
+    }
+
+    setUploadingFoto(true);
+
+    for (const file of newFiles) {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `/${id}/fotos/foto_${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from("negocios")
+        .upload(path, file, { cacheControl: "3600", upsert: true });
+
+      if (error) {
+        showToast("Error al subir imagen", "err");
+        continue;
+      }
+
+      const { data: urlData } = supabase.storage.from("negocios").getPublicUrl(path);
+      fotosActuales.push(urlData.publicUrl);
+    }
+
+    const { error: updateError } = await supabase
+      .from("negocio")
+      .update({ fotos: fotosActuales })
+      .eq("id", id);
+
+    if (updateError) {
+      showToast("Error al actualizar negocio con fotos", "err");
+    } else {
+      setNegocio(prev => ({ ...prev, fotos: fotosActuales }));
+      showToast("Fotos subidas correctamente.");
+    }
+    setUploadingFoto(false);
+  };
+
+  const handleEliminarFoto = async (fotoUrl: string) => {
+    const fotosNuevas = (negocio.fotos || []).filter(url => url !== fotoUrl);
+    
+    // Tratamos de extraer la ruta para borrarla del storage si es de supabase
+    if (fotoUrl.includes("supabase.co") && fotoUrl.includes("/negocios/")) {
+       const parts = fotoUrl.split("/negocios/");
+       if (parts.length > 1) {
+          const storagePath = parts[1];
+          await supabase.storage.from("negocios").remove([storagePath]);
+       }
+    }
+
+    const { error } = await supabase
+      .from("negocio")
+      .update({ fotos: fotosNuevas })
+      .eq("id", id);
+
+    if (error) {
+       showToast("Error al eliminar foto", "err");
+    } else {
+       setNegocio(prev => ({ ...prev, fotos: fotosNuevas }));
+       showToast("Foto eliminada correctamente.");
+    }
+  };
+
   if (!negocio) return null;
 
   const turnosMostrar = verTodasPendientes
@@ -392,7 +498,7 @@ export default function BusinessDashboardLayout({
 
           {/* Info del negocio */}
           <div className="flex items-center gap-4 pb-6">
-            <div className="h-16 w-16 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 relative">
+            <div className="h-16 w-16 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 relative group">
               {negocio.logo_url ? (
                 <Image
                   src={negocio.logo_url}
@@ -405,6 +511,24 @@ export default function BusinessDashboardLayout({
                   {negocio.nombre.charAt(0)}
                 </div>
               )}
+              {/* Overlay para editar logo */}
+              <label 
+                title="Cambiar logo"
+                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity duration-200 text-white z-10"
+              >
+                {uploadingLogo ? (
+                   <IconLoader2 size={20} className="animate-spin" />
+                ) : (
+                   <IconEdit size={20} />
+                )}
+                <input
+                   type="file"
+                   accept="image/*"
+                   className="hidden"
+                   onChange={handleLogoUpload}
+                   disabled={uploadingLogo}
+                />
+              </label>
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{negocio.nombre}</h1>
@@ -416,7 +540,7 @@ export default function BusinessDashboardLayout({
 
           {/* Tabs */}
           <div className="flex space-x-8 overflow-x-auto">
-            {["Resumen", "Servicios", "Equipo"].map((tab) => {
+            {["Resumen", "Servicios", "Equipo", "Fotos"].map((tab) => {
               const tabId = tab.toLowerCase();
               return (
                 <button
@@ -830,6 +954,79 @@ export default function BusinessDashboardLayout({
               )}
             </div>
           )}
+
+          {/* ── TAB: FOTOS ───────────────────────────────────────── */}
+          {activeTab === "fotos" && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Fotos del Negocio <span className="text-sm font-normal text-gray-500">{(negocio.fotos?.length || 0)} / 3 permitidas</span></h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Agrega fotos de tu establecimiento para lucirlo a tus clientes.
+                  </p>
+                </div>
+                <div>
+                  <label 
+                    title={((negocio.fotos?.length || 0) >= 3) ? "Límite de 3 fotos alcanzado" : "Subir fotos"}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                      ((negocio.fotos?.length || 0) >= 3) 
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                        : "cursor-pointer bg-[var(--primary)] text-white hover:opacity-90"
+                    }`}
+                  >
+                    {uploadingFoto ? (
+                      <IconLoader2 size={16} className="animate-spin" />
+                    ) : (
+                      <IconUpload size={16} />
+                    )}
+                    <span>Subir fotos</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={uploadingFoto || ((negocio.fotos?.length || 0) >= 3)}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {!(negocio.fotos && negocio.fotos.length > 0) ? (
+                <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <IconUpload size={48} className="mx-auto mb-3 opacity-40" stroke={1.5} />
+                  <p className="text-lg font-medium">No has subido fotos aún</p>
+                  <p className="text-sm mt-1">Sube tus primeras fotos haciendo clic en "Subir fotos"</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {(negocio.fotos || []).map((fotoUrl, idx) => (
+                    <div key={idx} className="relative group rounded-xl overflow-hidden shadow-sm aspect-video border border-gray-200">
+                      <img
+                        src={fotoUrl}
+                        alt={"Foto " + (idx + 1)}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
+                        <button
+                          onClick={() => {
+                            if (window.confirm("¿Seguro que deseas eliminar esta foto?")) {
+                              handleEliminarFoto(fotoUrl);
+                            }
+                          }}
+                          className="bg-red-500 hover:bg-red-600 text-white p-2.5 rounded-full shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
+                          title="Eliminar foto"
+                        >
+                          <IconTrash size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </main>
 
