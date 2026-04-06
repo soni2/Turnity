@@ -1,5 +1,8 @@
+import Header from "@/app/Components/Header";
 import BusinessDashboardLayout from "./BusinessDashboardLayout";
 import { createClient } from "@/lib/supabase/server";
+import { IconLockFilled } from "@tabler/icons-react";
+import NoAuth from "./NoAuth";
 
 export default async function NegocioDashboardPage({
   params,
@@ -24,7 +27,20 @@ export default async function NegocioDashboardPage({
     .eq("id", id);
 
   if (error || !data) {
-    return <div>No autorizado</div>;
+    return <NoAuth />;
+  }
+
+  if (!user) {
+    return <NoAuth />;
+  }
+
+  if (data[0].dueno_id !== user.id) {
+    return (
+      <>
+        <Header variant="app" />
+        <NoAuth />;
+      </>
+    );
   }
 
   return <BusinessDashboardLayout data={data} id={id} />;
