@@ -672,7 +672,7 @@ export default function Header({ variant = "home" }: HeaderProps) {
   return (
     <nav className={`p-4 w-full fixed top-0 z-50 transition-all ${navStyles} ${textStyles}`}>
       <div className="md:max-w-[1200px] mx-auto flex items-center justify-between gap-4">
-        <Link href="/index" className="flex items-center gap-2">
+        <Link href="/explore" className="flex items-center gap-2">
           <Logo className={`${solid ? "fill-white" : "fill-[var(--primary)]"} h-7`} />
         </Link>
         <div className="flex items-center gap-3">

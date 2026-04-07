@@ -128,6 +128,8 @@ export default function CentroPage() {
     message: "",
   });
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [turnosActuales, setTurnosActuales] = useState<turno[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   // Detectar si es móvil
   useEffect(() => {
@@ -180,7 +182,7 @@ export default function CentroPage() {
       const { data: turnos } = await supabase
         .from("turno")
         .select("id, empleado_id, fecha, hora_inicio, estado")
-        .in("estado", ["pendiente", "confirmado", "confirmada"])
+        .in("estado", ["pendiente", "confirmado"])
         .in(
           "empleado_id",
           empIds.length > 0 ? empIds : ["00000000-0000-0000-0000-000000000000"],
@@ -379,46 +381,129 @@ export default function CentroPage() {
   const selectedDateObj = upcomingDates.find(
     (d) => d.dateString === selectedDate,
   );
-  const availableTimesForSelectedDate = useMemo(() => {
-    if (!selectedDateObj || !centro || !selectedProfesional) return [];
+  // Re-fetch turnos frescos al cambiar profesional o fecha
+  // Mejora el useEffect que fetch los turnos
+  useEffect(() => {
+    if (!selectedDateObj || !selectedProfesional || !centro) return;
 
-    // Todos los slots teóricos del local para ese dia (Ej. ['09:00', '10:00', ...])
-    const allSlots: string[] =
-      centro.horariosDisponibles[
-        selectedDateObj.key as keyof typeof centro.horariosDisponibles
-      ] || [];
+    const currentCentro = centro;
+    const queryDate = selectedDateObj.dateString;
 
-    if (selectedProfesional === "cualquiera") {
-      // Buscar si al menos existe 1 estilista libre en este slot.
-      return allSlots.filter((slot) => {
-        let ocupadosCount = 0;
-        centro.profesionales.forEach((pro) => {
-          const proOcupado = centro.turnosFuturos.find(
-            (t) =>
-              t.fecha === selectedDateObj.dateString &&
-              t.hora_inicio.substring(0, 5) === slot &&
-              t.empleado_id === pro.id,
-          );
-          if (proOcupado) ocupadosCount++;
-        });
-        return ocupadosCount < centro.profesionales.length; // Si hay menos ocupados que el total, significa que alguien está libre
+    async function fetchTurnosActuales() {
+      setLoadingSlots(true);
+
+      const empIds =
+        selectedProfesional === "cualquiera"
+          ? currentCentro.profesionales.map((p) => p.id)
+          : [selectedProfesional];
+
+      // Si no hay profesionales, no tiene sentido consultar turnos
+      if (empIds.length === 0) {
+        setTurnosActuales([]);
+        setLoadingSlots(false);
+        return;
+      }
+
+      console.log("Fetching turnos para:", {
+        fecha: queryDate,
+        profesionales: empIds,
       });
+
+      const { data, error } = await createClient()
+        .from("turno")
+        .select("id, empleado_id, fecha, hora_inicio, estado")
+        .in("estado", ["pendiente", "confirmado"])
+        .in("empleado_id", empIds)
+        .eq("fecha", queryDate);
+
+      if (error) {
+        console.error("Error fetching turnos:", error.message || error);
+        setTurnosActuales([]);
+      } else {
+        console.log("Turnos encontrados:", data);
+        setTurnosActuales((data as turno[]) || []);
+      }
+
+      setLoadingSlots(false);
     }
 
-    // Si se seleccionó un profesional concreto
-    const turnosDelPro = (centro.turnosFuturos || []).filter(
-      (t) =>
-        t.fecha === selectedDateObj.dateString &&
-        t.empleado_id === selectedProfesional,
-    );
-    const horasOcupadas = turnosDelPro.map((t) =>
-      t.hora_inicio.substring(0, 5),
-    );
+    fetchTurnosActuales();
+  }, [selectedDateObj, selectedProfesional, centro]);
+  // Reemplaza todo el useMemo de slotsForSelectedDate con esto:
 
-    // Filtramos horas en base al calendario y le sumamos un chequeo en caso de que el estilista tenga jornada individual futura
-    // (Aca el slot entra como '09:00', asi que horasOcupadas.includes funciona perfecto)
-    return allSlots.filter((slot) => !horasOcupadas.includes(slot));
-  }, [centro, selectedDateObj, selectedProfesional]);
+  const slotsForSelectedDate = useMemo(() => {
+    if (!selectedDateObj || !centro || !selectedProfesional) return [];
+
+    const dateStr = selectedDateObj.dateString;
+    const dayKey = selectedDateObj.key;
+
+    // 1. Obtener las horas base del negocio para ese día
+    const businessHours = centro.horariosDisponibles[dayKey] || [];
+
+    if (businessHours.length === 0) return [];
+
+    // 2. Normalizar hora (formato HH:MM)
+    const normalizeHora = (h: string): string => {
+      if (!h) return "00:00";
+      const [hh, mm] = h.split(":");
+      return `${String(parseInt(hh, 10)).padStart(2, "0")}:${String(parseInt(mm || "0", 10)).padStart(2, "0")}`;
+    };
+
+    // 3. Filtrar horas pasadas si es hoy
+    const todayStr = new Date().toISOString().split("T")[0];
+    const isToday = dateStr === todayStr;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const availableHours = businessHours.filter((hour) => {
+      if (!isToday) return true;
+      const [h, m] = hour.split(":").map(Number);
+      return h * 60 + m > currentMinutes;
+    });
+
+    // 4. Crear array de slots con estado de ocupado
+    const slots = availableHours.map((hour) => {
+      const normalizedHour = normalizeHora(hour);
+      let isOccupied = false;
+
+      if (selectedProfesional === "cualquiera") {
+        // Contar cuántos turnos hay en esa hora para CUALQUIER profesional
+        const turnosEnEsaHora = turnosActuales.filter(
+          (turno) => normalizeHora(turno.hora_inicio) === normalizedHour,
+        ).length;
+
+        // Si todos los profesionales están ocupados en esa hora, bloquear
+        isOccupied = turnosEnEsaHora >= centro.profesionales.length;
+      } else {
+        // Verificar si el profesional específico ya tiene turno en esa hora
+        isOccupied = turnosActuales.some(
+          (turno) =>
+            normalizeHora(turno.hora_inicio) === normalizedHour &&
+            turno.empleado_id === selectedProfesional,
+        );
+      }
+
+      return {
+        hora: hour,
+        ocupado: isOccupied, // Cambiado a 'ocupado' para claridad
+        bloqueado: isOccupied || loadingSlots, // Para UI
+      };
+    });
+
+    console.log("Slots calculados:", slots); // Debug: verifica en consola
+    return slots;
+  }, [
+    centro,
+    selectedDateObj,
+    selectedProfesional,
+    turnosActuales,
+    loadingSlots,
+  ]);
+
+  // Solo los slots libres (para validar antes de guardar)
+  const availableTimesForSelectedDate = slotsForSelectedDate
+    .filter((s) => !s.bloqueado)
+    .map((s) => s.hora);
 
   const renderStars = (rating: number) => {
     return (
@@ -624,20 +709,23 @@ export default function CentroPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user || !selectedService || !selectedTime || !selectedDate) return;
+    if (!user || !selectedService || !selectedTime || !selectedDate || !centro) return;
 
-    // Si eligio "Cualquiera", el sistema debe asignar de manera inteligente al empleado disponible en ese horario
+    // Si eligio "Cualquiera", asignar al profesional libre usando datos frescos
     let finalEmpleadoId = selectedProfesional;
     if (selectedProfesional === "cualquiera") {
-      const profesionalesLibres = centro.profesionales.filter((pro) => {
-        const proTieneTurno = centro.turnosFuturos.find(
-          (t) =>
-            t.fecha === selectedDate &&
-            t.hora_inicio.substring(0, 5) === selectedTime &&
-            t.empleado_id === pro.id,
-        );
-        return !proTieneTurno;
-      });
+      const normalizeH = (h: string) => {
+        const p = h.split(":");
+        return `${String(parseInt(p[0] || "0", 10)).padStart(2, "0")}:${String(parseInt(p[1] || "0", 10)).padStart(2, "0")}`;
+      };
+      const profesionalesLibres = centro.profesionales.filter(
+        (pro) =>
+          !turnosActuales.some(
+            (t) =>
+              normalizeH(t.hora_inicio) === normalizeH(selectedTime) &&
+              t.empleado_id === pro.id,
+          ),
+      );
 
       if (profesionalesLibres.length > 0) {
         finalEmpleadoId = profesionalesLibres[0].id;
@@ -671,6 +759,17 @@ export default function CentroPage() {
         title: "¡Reserva confirmada!",
         message: "Tu pago fue procesado y tu cita ha sido agendada con éxito.",
       });
+      // Actualizar el turno recién creado en turnosActuales para bloquear el slot de inmediato
+      setTurnosActuales((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          fecha: selectedDate!,
+          hora_inicio: selectedTime,
+          estado: "pendiente",
+          empleado_id: finalEmpleadoId ?? undefined,
+        },
+      ]);
       setSelectedService(null);
       setSelectedTime("");
       setSelectedDate(null);
@@ -1180,6 +1279,12 @@ export default function CentroPage() {
                         4
                       </span>
                       Selecciona un horario
+                      {loadingSlots && (
+                        <span className="ml-auto text-[10px] text-gray-400 font-normal flex items-center gap-1">
+                          <span className="w-3 h-3 border-2 border-gray-300 border-t-[var(--primary)] rounded-full animate-spin inline-block" />
+                          Verificando...
+                        </span>
+                      )}
                     </label>
 
                     {isMobile ? (
@@ -1197,16 +1302,16 @@ export default function CentroPage() {
                         }}
                       >
                         <option value="">Seleccionar hora disponible</option>
-                        {availableTimesForSelectedDate?.map((hora) => (
-                          <option key={hora} value={hora}>
-                            {hora}
+                        {slotsForSelectedDate.map(({ hora, ocupado }) => (
+                          <option key={hora} value={hora} disabled={ocupado}>
+                            {hora} {ocupado ? "(Ocupado)" : ""}
                           </option>
                         ))}
                       </select>
                     ) : (
                       // Botones de selección única para desktop
                       <div>
-                        {availableTimesForSelectedDate.length === 0 ? (
+                        {slotsForSelectedDate.length === 0 ? (
                           <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                             <p className="text-sm text-gray-500 font-medium">
                               No hay horarios disponibles
@@ -1217,19 +1322,29 @@ export default function CentroPage() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-4 gap-2">
-                            {availableTimesForSelectedDate?.map((hora) => (
-                              <button
-                                key={hora}
-                                onClick={() => setSelectedTime(hora)}
-                                className={`px-2 py-2.5 text-xs font-bold border-2 rounded-xl transition-all ${
-                                  selectedTime === hora
-                                    ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-md"
-                                    : "bg-white border-gray-100 hover:border-[var(--primary)]/40 text-gray-700 hover:bg-gray-50"
-                                }`}
-                              >
-                                {hora}
-                              </button>
-                            ))}
+                            {slotsForSelectedDate.map(
+                              ({ hora, ocupado, bloqueado }) => (
+                                <button
+                                  key={hora}
+                                  disabled={bloqueado}
+                                  onClick={() =>
+                                    !bloqueado && setSelectedTime(hora)
+                                  }
+                                  className={`relative px-2 py-2.5 text-xs font-bold border-2 rounded-xl transition-all ${
+                                    bloqueado
+                                      ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60 line-through"
+                                      : selectedTime === hora
+                                        ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-md scale-105"
+                                        : "bg-white border-gray-100 hover:border-[var(--primary)]/40 text-gray-700 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  {hora}
+                                  {!loadingSlots && ocupado && (
+                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+                                  )}
+                                </button>
+                              ),
+                            )}
                           </div>
                         )}
 
