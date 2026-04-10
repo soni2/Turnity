@@ -259,7 +259,7 @@ export default function CentroPage() {
         console.error("Error fetching turnos:", error.message || error);
         setTurnosActuales([]);
       } else {
-        setTurnosActuales((data as turno[]) || []);
+        setTurnosActuales((data as unknown as turno[]) || []);
       }
 
       setLoadingSlots(false);
@@ -287,7 +287,7 @@ export default function CentroPage() {
       (k) => ({
         lun: "lunes", mar: "martes", mie: "miercoles",
         jue: "jueves", vie: "viernes", sab: "sabado", dom: "domingo",
-      }[dayKey] === k) ?? false
+      }[dayKey] === k)
     ) ?? ""];
 
     if (!dayConfig?.abierto) return [];
