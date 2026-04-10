@@ -510,6 +510,44 @@ export default function BusinessDashboardLayout({
     }
   };
 
+  // ── Abandonar negocio (empleado) ─────────────────────────────────────────────
+  const [abandonarOpen, setAbandonarOpen] = useState(false);
+  const [abandonando, setAbandonando] = useState(false);
+
+  const handleAbandonarNegocio = async () => {
+    setAbandonando(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setAbandonando(false); return; }
+
+    // Find employee record for current user in this business
+    const { data: empData } = await supabase
+      .from("empleado")
+      .select("id")
+      .eq("negocio_id", id)
+      .eq("usuario_id", user.id)
+      .eq("activo", true)
+      .single();
+
+    if (!empData) {
+      showToast("No se encontró tu perfil de empleado.", "err");
+      setAbandonando(false);
+      setAbandonarOpen(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("empleado")
+      .update({ activo: false })
+      .eq("id", empData.id);
+
+    setAbandonando(false);
+    if (error) {
+      showToast("Error al abandonar el negocio.", "err");
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
   if (!negocio) return null;
 
   const turnosMostrar = verTodasPendientes
@@ -574,9 +612,13 @@ export default function BusinessDashboardLayout({
               </div>
             )}
             {isEmpleado && (
-              <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200">
-                👁 Vista de empleado — solo lectura
-              </span>
+              <button
+                onClick={() => setAbandonarOpen(true)}
+                className="flex items-center gap-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors border border-orange-200"
+              >
+                <IconArrowLeft size={15} />
+                Abandonar negocio
+              </button>
             )}
           </div>
 
@@ -808,15 +850,17 @@ export default function BusinessDashboardLayout({
                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-semibold text-gray-900">Horarios</h3>
-                      <button
-                        onClick={() => {
-                          setHorariosEdit({ ...negocio.horarios });
-                          setEditHorariosOpen(true);
-                        }}
-                        className="text-xs text-[var(--primary)] flex items-center gap-1 hover:underline"
-                      >
-                        <IconEdit size={12} /> Editar
-                      </button>
+                      {!isEmpleado && (
+                        <button
+                          onClick={() => {
+                            setHorariosEdit({ ...negocio.horarios });
+                            setEditHorariosOpen(true);
+                          }}
+                          className="text-xs text-[var(--primary)] flex items-center gap-1 hover:underline"
+                        >
+                          <IconEdit size={12} /> Editar
+                        </button>
+                      )}
                     </div>
                     <div className="space-y-2">
                       {DIAS_MAP.map((dia) => {
@@ -841,21 +885,23 @@ export default function BusinessDashboardLayout({
                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-semibold text-gray-900">Información</h3>
-                      <button
-                        onClick={() => {
-                          setInfoEdit({
-                            nombre: negocio.nombre || "",
-                            email_contacto: negocio.email_contacto || "",
-                            telefono_contacto: negocio.telefono_contacto || "",
-                            descripcion: negocio.descripcion || "",
-                            categoria: negocio.categoria || "",
-                          });
-                          setEditInfoOpen(true);
-                        }}
-                        className="text-xs text-[var(--primary)] flex items-center gap-1 hover:underline"
-                      >
-                        <IconEdit size={12} /> Editar
-                      </button>
+                      {!isEmpleado && (
+                        <button
+                          onClick={() => {
+                            setInfoEdit({
+                              nombre: negocio.nombre || "",
+                              email_contacto: negocio.email_contacto || "",
+                              telefono_contacto: negocio.telefono_contacto || "",
+                              descripcion: negocio.descripcion || "",
+                              categoria: negocio.categoria || "",
+                            });
+                            setEditInfoOpen(true);
+                          }}
+                          className="text-xs text-[var(--primary)] flex items-center gap-1 hover:underline"
+                        >
+                          <IconEdit size={12} /> Editar
+                        </button>
+                      )}
                     </div>
                     <div className="space-y-2 text-sm text-gray-600">
                       <p>
@@ -1443,6 +1489,48 @@ export default function BusinessDashboardLayout({
                   <IconCheck size={16} />
                 )}
                 {editServicioModal === "nuevo" ? "Crear servicio" : "Guardar cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Abandonar Negocio (empleado) ──────────────────────────────── */}
+      {abandonarOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="bg-orange-500 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white">
+                <IconAlertTriangle size={20} />
+                <h2 className="font-semibold">Abandonar negocio</h2>
+              </div>
+              <button onClick={() => setAbandonarOpen(false)} className="text-white/70 hover:text-white">
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700">
+                ¿Estás seguro de que deseas <strong>abandonar</strong> el negocio{" "}
+                <strong>{negocio.nombre}</strong>? Dejarás de aparecer como empleado activo y perderás acceso al dashboard de este negocio.
+              </p>
+              <p className="text-xs text-gray-500 bg-orange-50 border border-orange-100 rounded-xl p-3">
+                El dueño del negocio podrá volverte a invitar si lo desea.
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setAbandonarOpen(false)}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAbandonarNegocio}
+                disabled={abandonando}
+                className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {abandonando ? <IconLoader2 size={16} className="animate-spin" /> : <IconArrowLeft size={16} />}
+                Abandonar
               </button>
             </div>
           </div>

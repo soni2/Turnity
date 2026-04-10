@@ -18,6 +18,7 @@ export async function GET(request: Request) {
       categoria,
       logo_url,
       fotos,
+      horarios,
       resenas:resena (rating)
     `);
 
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
         categoria: n.categoria || "Barbería",
         logo_url: n.logo_url || "/no-picture.webp",
         fotos: n.fotos || ["/no-picture.webp"],
+        horarios: n.horarios || {},
       };
     });
 

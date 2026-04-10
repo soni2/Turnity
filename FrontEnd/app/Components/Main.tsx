@@ -1,11 +1,9 @@
 import { JSX } from "react";
-import { Buttons } from "./Buttons";
 import { useFunctions } from "../hooks/useFunctions";
 import Link from "next/link";
-import { SearchIcon } from "./Icons";
 import Image from "next/image";
 
-type Servicios = {
+type Servicio = {
   id: string;
   title: string;
   description: string;
@@ -14,46 +12,65 @@ type Servicios = {
   categoria: string;
   logo_url: string;
   fotos: string[];
+  horarios?: Record<string, { abierto: boolean; apertura: string; cierre: string }>;
+};
+
+type ActiveFilters = {
+  ratingMin: number;
+  abiertoAhora: boolean;
+  disponibleHoy: boolean;
 };
 
 type Props = {
   ordenarPor: string;
-  servicios: Servicios[];
+  servicios: Servicio[];
   setOrdenarPor: React.Dispatch<React.SetStateAction<string>>;
   renderStars: (rating: number) => JSX.Element;
   busqueda: string;
   setBusqueda: React.Dispatch<React.SetStateAction<string>>;
+  activeFilters?: ActiveFilters;
 };
+
+// Helpers de disponibilidad (duplicados aquí para no crear dependencia circular)
+const DIAS_KEYS: Record<number, string> = {
+  0: "domingo", 1: "lunes", 2: "martes", 3: "miercoles",
+  4: "jueves", 5: "viernes", 6: "sabado",
+};
+
+function timeToMin(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
+
+function negocioAbiertoAhora(horarios?: Record<string, any>): boolean {
+  if (!horarios) return false;
+  const now = new Date();
+  const cfg = horarios[DIAS_KEYS[now.getDay()]];
+  if (!cfg?.abierto) return false;
+  const cur = now.getHours() * 60 + now.getMinutes();
+  return cur >= timeToMin(cfg.apertura) && cur < timeToMin(cfg.cierre);
+}
 
 export default function Main({
   ordenarPor,
   servicios,
   setOrdenarPor,
   renderStars,
+  activeFilters,
 }: Props) {
   const { handleRouter } = useFunctions();
 
   return (
     <main className="flex-1">
-      {/* Buscador */}
-      {/* <div className="relative mb-6">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar servicios, estilistas..."
-          className="w-full pl-10 pr-20 sm:pr-24 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white placeholder:text-gray-500 text-black"
-        />
-        <button className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[var(--primary)] text-white px-3 sm:px-5 py-1.5 rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
-          Buscar
-        </button>
-        <SearchIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-      </div> */}
-
       {/* Ordenar por */}
       <div className="flex justify-between items-center mb-6">
         <p className="text-sm text-gray-600">
-          Mostrando {servicios.length} resultados
+          Mostrando <span className="font-semibold text-gray-900">{servicios.length}</span> resultados
+          {activeFilters && (activeFilters.abiertoAhora || activeFilters.disponibleHoy || activeFilters.ratingMin > 0) && (
+            <span className="ml-2 text-xs text-[var(--primary)] font-medium">
+              (filtros activos)
+            </span>
+          )}
         </p>
         <select
           value={ordenarPor}
@@ -65,70 +82,106 @@ export default function Main({
         </select>
       </div>
 
-      {/* Grid de servicios */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {servicios.map((servicio) => (
-          <div
-            key={servicio.id}
-            className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col h-full"
-          >
-            <div className="relative w-full h-52 shrink-0 mb-4">
-              <Image
-                src={servicio.fotos[0]}
-                alt={servicio.title}
-                fill
-                className="object-cover rounded-xl"
-              />
-            </div>
-            <div className="flex flex-col flex-1">
-              <Link
-                href={`/business/${servicio.id}`}
-                className="flex flex-row items-center gap-2 mb-2"
+      {/* Estado vacío */}
+      {servicios.length === 0 ? (
+        <div className="col-span-full flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+          </div>
+          <p className="text-lg font-semibold text-gray-700 mb-1">Sin resultados</p>
+          <p className="text-sm text-gray-400 max-w-xs">
+            {activeFilters?.abiertoAhora
+              ? "Ningún negocio está abierto en este momento con los filtros aplicados."
+              : activeFilters?.disponibleHoy
+              ? "Ningún negocio tiene horario disponible hoy con los filtros aplicados."
+              : "Prueba ajustando los filtros o la búsqueda."}
+          </p>
+        </div>
+      ) : (
+        /* Grid de servicios */
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {servicios.map((servicio) => {
+            const abierto = negocioAbiertoAhora(servicio.horarios);
+            const fotoSrc = servicio.fotos?.[0] || "/no-picture.webp";
+            const logoSrc = servicio.logo_url || "/no-picture.webp";
+
+            return (
+              <div
+                key={servicio.id}
+                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col h-full"
               >
-                <Image
-                  src={servicio.logo_url}
-                  alt={servicio.title}
-                  width={40}
-                  height={40}
-                  className="rounded-xl object-cover shrink-0"
-                />
-                <h3 className="font-semibold text-lg mb-1 leading-tight line-clamp-2">
-                  {servicio.title}
-                </h3>
-              </Link>
-              <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                {servicio.description}
-              </p>
-              
-              <div className="mt-auto flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {servicio.rating === "Nuevo" ? (
-                       <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 uppercase tracking-wide">Nuevo</span>
-                    ) : (
-                       <>
-                         {renderStars(Number(servicio.rating))}
-                         <span className="text-sm font-bold text-amber-700">
-                           {servicio.rating}
-                         </span>
-                         <span className="text-xs font-semibold text-amber-600/60">
-                           ({servicio.resenaCount})
-                         </span>
-                       </>
-                    )}
+                {/* Imagen de portada */}
+                <div className="relative w-full h-52 shrink-0 mb-4">
+                  <Image
+                    src={fotoSrc}
+                    alt={servicio.title}
+                    fill
+                    className="object-cover rounded-xl"
+                  />
+                  {/* Badge "Abierto ahora" */}
+                  {abierto && (
+                    <span className="absolute top-2 right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                      Abierto ahora
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col flex-1">
+                  <Link
+                    href={`/business/${servicio.id}`}
+                    className="flex flex-row items-center gap-2 mb-2"
+                  >
+                    <Image
+                      src={logoSrc}
+                      alt={servicio.title}
+                      width={40}
+                      height={40}
+                      className="rounded-xl object-cover shrink-0"
+                    />
+                    <h3 className="font-semibold text-lg mb-1 leading-tight line-clamp-2">
+                      {servicio.title}
+                    </h3>
+                  </Link>
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                    {servicio.description}
+                  </p>
+
+                  <div className="mt-auto flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        {servicio.rating === "Nuevo" ? (
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 uppercase tracking-wide">
+                            Nuevo
+                          </span>
+                        ) : (
+                          <>
+                            {renderStars(Number(servicio.rating))}
+                            <span className="text-sm font-bold text-amber-700">
+                              {servicio.rating}
+                            </span>
+                            <span className="text-xs font-semibold text-amber-600/60">
+                              ({servicio.resenaCount})
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRouter(`/business/${servicio.id}`)}
+                      className="w-full bg-[var(--primary)] text-white py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                    >
+                      Reservar
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleRouter(`/business/${servicio.id}`)}
-                  className="w-full bg-[var(--primary)] text-white py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                  Reservar
-                </button>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </main>
   );
 }

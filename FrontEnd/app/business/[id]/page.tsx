@@ -81,7 +81,7 @@ export default function CentroPage() {
       const todayStr = new Date().toISOString().split("T")[0];
       const { data: turnos } = await supabase
         .from("turno")
-        .select("id, empleado_id, fecha, hora_inicio, estado")
+        .select("id, empleado_id, fecha, hora_inicio, estado, servicio:servicio_id(duracion)")
         .in("estado", ["pendiente", "confirmado"])
         .in(
           "empleado_id",
@@ -122,12 +122,16 @@ export default function CentroPage() {
         jueves: "jue", viernes: "vie", sabado: "sab", domingo: "dom",
       };
 
-      function generarSlots(apertura: string, cierre: string): string[] {
+      function generarSlots(apertura: string, cierre: string, stepMin = 60): string[] {
         const slots: string[] = [];
         const [hIni, mIni] = apertura.split(":").map(Number);
-        const [hFin] = cierre.split(":").map(Number);
-        for (let h = hIni; h < hFin; h++) {
-          slots.push(`${String(h).padStart(2, "0")}:${String(mIni).padStart(2, "0")}`);
+        const [hFin, mFin] = cierre.split(":").map(Number);
+        const startTotal = hIni * 60 + mIni;
+        const endTotal = hFin * 60 + (mFin || 0);
+        for (let t = startTotal; t < endTotal; t += stepMin) {
+          const h = Math.floor(t / 60);
+          const m = t % 60;
+          slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
         }
         return slots;
       }
@@ -246,7 +250,7 @@ export default function CentroPage() {
 
       const { data, error } = await createClient()
         .from("turno")
-        .select("id, empleado_id, fecha, hora_inicio, estado")
+        .select("id, empleado_id, fecha, hora_inicio, estado, servicio:servicio_id(duracion)")
         .in("estado", ["pendiente", "confirmado"])
         .in("empleado_id", empIds)
         .eq("fecha", queryDate);
@@ -264,54 +268,97 @@ export default function CentroPage() {
     fetchTurnosActuales();
   }, [selectedDateObj, selectedProfesional, centro]);
 
-  // Calcular slots disponibles y su estado de ocupación
+  // Calcular slots disponibles y su estado de ocupación (granularidad fina + duración dinámica)
   const slotsForSelectedDate = useMemo(() => {
-    if (!selectedDateObj || !centro || !selectedProfesional) return [];
+    if (!selectedDateObj || !centro || !selectedProfesional || !selectedService) return [];
 
     const dateStr = selectedDateObj.dateString;
     const dayKey = selectedDateObj.key;
-    const businessHours = centro.horariosDisponibles[dayKey] || [];
-    if (businessHours.length === 0) return [];
 
-    const normalizeHora = (h: string): string => {
-      if (!h) return "00:00";
-      const [hh, mm] = h.split(":");
-      return `${String(parseInt(hh, 10)).padStart(2, "0")}:${String(parseInt(mm || "0", 10)).padStart(2, "0")}`;
+    // Obtener duración del servicio seleccionado (en minutos)
+    const servicioActual = centro.servicios.find((s) => s.id === selectedService);
+    const duracionMin = Math.max(15, parseInt(String(servicioActual?.duracion || "60"), 10) || 60);
+
+    // Paso de generación SIEMPRE fino (15 min), independiente de la duración del servicio.
+    // Esto permite p.ej. reservar a las 3:30 para un servicio de 50 min.
+    const STEP = 15;
+
+    const dayConfig = centro.horariosRaw[Object.keys(centro.horariosRaw).find(
+      (k) => ({
+        lun: "lunes", mar: "martes", mie: "miercoles",
+        jue: "jueves", vie: "viernes", sab: "sabado", dom: "domingo",
+      }[dayKey] === k) ?? false
+    ) ?? ""];
+
+    if (!dayConfig?.abierto) return [];
+
+    const [hIni, mIni] = dayConfig.apertura.split(":").map(Number);
+    const [hFin, mFin] = dayConfig.cierre.split(":").map(Number);
+    const startTotal = hIni * 60 + mIni;
+    const endTotal = hFin * 60 + (mFin || 0);
+
+    const toMinutes = (hora: string): number => {
+      if (!hora) return 0;
+      const [hh, mm] = hora.split(":").map((p) => parseInt(p, 10));
+      return hh * 60 + (mm || 0);
     };
 
     const todayStr = new Date().toISOString().split("T")[0];
     const isToday = dateStr === todayStr;
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = isToday
+      ? new Date().getHours() * 60 + new Date().getMinutes()
+      : -1;
 
-    const availableHours = businessHours.filter((hour) => {
-      if (!isToday) return true;
-      const [h, m] = hour.split(":").map(Number);
-      return h * 60 + m > currentMinutes;
-    });
+    // Pre-calcular turnos con duración para evitar repetir el cómputo por cada slot
+    const turnosConDuracion = turnosActuales.map((t) => ({
+      empleado_id: t.empleado_id,
+      start: toMinutes(t.hora_inicio),
+      end: toMinutes(t.hora_inicio) + (parseInt(String((t as any).servicio?.duracion || "60"), 10) || 60),
+    }));
 
-    return availableHours.map((hour) => {
-      const normalizedHour = normalizeHora(hour);
+    const slotsBase: string[] = [];
+    // Generar candidatos cada STEP minutos; incluir slot solo si el bloque [slot, slot+duración]
+    // cabe completamente dentro del horario del negocio.
+    for (let t = startTotal; t + duracionMin <= endTotal; t += STEP) {
+      if (isToday && t <= currentMinutes) continue; // Descartar slots pasados (hoy)
+      const h = Math.floor(t / 60);
+      const m = t % 60;
+      slotsBase.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
+
+    return slotsBase.map((hora) => {
+      const slotStart = toMinutes(hora);
+      const slotEnd = slotStart + duracionMin;
       let isOccupied = false;
 
       if (selectedProfesional === "cualquiera") {
-        const turnosEnEsaHora = turnosActuales.filter(
-          (turno) => normalizeHora(turno.hora_inicio) === normalizedHour,
-        ).length;
-        isOccupied = turnosEnEsaHora >= centro.profesionales.length;
+        // Está ocupado si TODOS los profesionales tienen un turno que solapa esta ventana
+        const profesionalesOcupados = new Set(
+          turnosConDuracion
+            .filter((t) => t.start < slotEnd && t.end > slotStart)
+            .map((t) => t.empleado_id)
+        );
+        isOccupied = profesionalesOcupados.size >= centro.profesionales.length;
       } else {
-        isOccupied = turnosActuales.some(
-          (turno) =>
-            normalizeHora(turno.hora_inicio) === normalizedHour &&
-            turno.empleado_id === selectedProfesional,
+        // Un slot está ocupado si algún turno del profesional seleccionado solapa la ventana
+        isOccupied = turnosConDuracion.some(
+          (t) => t.empleado_id === selectedProfesional && t.start < slotEnd && t.end > slotStart
         );
       }
 
-      return { hora: hour, ocupado: isOccupied, bloqueado: isOccupied || loadingSlots };
+      return { hora, ocupado: isOccupied, bloqueado: isOccupied || loadingSlots };
     });
-  }, [centro, selectedDateObj, selectedProfesional, turnosActuales, loadingSlots]);
+  }, [centro, selectedDateObj, selectedProfesional, selectedService, turnosActuales, loadingSlots]);
 
   // Handlers de selección
+  const handleSelectService = (id: string | null) => {
+    setSelectedService(id);
+    // Resetear los pasos siguientes para que los slots se recalculen con la nueva duración
+    setSelectedProfesional(null);
+    setSelectedDate(null);
+    setSelectedTime("");
+  };
+
   const handleSelectProfesional = (id: string) => {
     setSelectedProfesional(id);
     setSelectedDate(null);
@@ -430,7 +477,7 @@ export default function CentroPage() {
             <ServicesList
               servicios={centro.servicios}
               selectedService={selectedService}
-              onSelectService={setSelectedService}
+              onSelectService={handleSelectService}
             />
             <div className="mb-6">
               <HorariosPreview horarios={centro.horariosRaw} />

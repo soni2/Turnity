@@ -58,9 +58,21 @@ export default function BookingPanel({
 
       {/* Servicio seleccionado (resumen) */}
       {selectedService && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-500">Servicio seleccionado</p>
-          <p className="font-medium">{servicioSeleccionado?.nombre}</p>
+        <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-100">
+          <p className="text-xs text-purple-500 font-medium uppercase tracking-wider mb-1">Servicio seleccionado</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-semibold text-gray-900">{servicioSeleccionado?.nombre}</p>
+            {servicioSeleccionado?.duracion && (
+              <span className="text-xs font-bold text-purple-700 bg-white border border-purple-200 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                ⏱ {servicioSeleccionado.duracion} min
+              </span>
+            )}
+          </div>
+          {servicioSeleccionado?.duracion && (
+            <p className="text-[10px] text-purple-400 mt-1">
+              Solo aparecen horarios donde caben los {servicioSeleccionado.duracion} min completos
+            </p>
+          )}
         </div>
       )}
 
